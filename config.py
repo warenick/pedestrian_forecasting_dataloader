@@ -272,7 +272,7 @@ cfg = {
     'raster_params': {
         "draw_hist": True,
         "use_map": False,
-        "normalize": True,
+        "normalize": False,
         # 'raster_size': [224, 224],
         # 'pixel_size': [0.5, 0.5],
         # 'ego_center': [0.25, 0.5],

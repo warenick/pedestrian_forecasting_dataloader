@@ -418,8 +418,11 @@ class UnifiedInterface:
                                             axis=0)
         self.world_from_agent = np.stack([np.array(data[i]["world_from_agent"]) for i in range(len(data))],
                                             axis=0)
-        self.loc_im_to_glob = np.stack([np.array(data[i]["loc_im_to_glob"]) for i in range(len(data))],
+        try:
+            self.loc_im_to_glob = np.stack([np.array(data[i]["loc_im_to_glob"]) for i in range(len(data))],
                                             axis=0)
+        except:                
+            self.loc_im_to_glob = None                  
         self.centroid = None
         self.extent = None
         self.yaw = None
@@ -434,7 +437,7 @@ def collate_wrapper(batch):
 if __name__ == "__main__":
     pass
     path_ = "data/train/"
-    files = [ "biwi_eth/biwi_eth.txt", "crowds/crowds_zara02.txt", "crowds/crowds_zara03.txt", "crowds/students001.txt",
+    files = [ "crowds/crowds_zara02.txt", "crowds/crowds_zara03.txt", "crowds/students001.txt",
          "crowds/students003.txt",
         # "stanford/bookstore_0.txt", "stanford/bookstore_1.txt",
         # "stanford/bookstore_2.txt", "stanford/bookstore_3.txt",
@@ -442,8 +445,8 @@ if __name__ == "__main__":
         # "stanford/deathCircle_0.txt",
         ]
     dataset = DatasetFromTxt(path_, files, cfg)
-    dataloader = DataLoader(dataset, batch_size=128,
-                            shuffle=False, num_workers=8, collate_fn=collate_wrapper)
+    dataloader = DataLoader(dataset, batch_size=32,
+                            shuffle=False, num_workers=0, collate_fn=collate_wrapper)
 
     from tqdm import tqdm
     for i, data in enumerate(tqdm(dataloader)):
