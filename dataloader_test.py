@@ -1,48 +1,85 @@
 import numpy as np
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageOps
 import matplotlib.pyplot as plt
-from scripts.config import cfg
-from scripts.dataloader import DatasetFromTxt
+from config import cfg
+from dataloader import DatasetFromTxt
+from utils import transform_points
 from tqdm import tqdm
 import torch
 
 draw_n = 1
-draw_a_h = 0
+draw_a_h = 1
 draw_speeds = 0
-draw_targets = 0
+draw_targets = 1
 once = 1
+
 if __name__ == "__main__":
+    # cfg["raster_params"]["use_map"] = True
+    # cfg["raster_params"]["normalize"] = False
+    #
+    # files = ["UCY/students03/students03.txt"]
+    #
+    #
+    # # files = ["eth_hotel/eth_hotel.txt"]
+    files = ["SDD/bookstore_0.txt", "SDD/bookstore_1.txt", "SDD/bookstore_2.txt", "SDD/bookstore_3.txt",
+             "SDD/bookstore_4.txt", "SDD/bookstore_5.txt", "SDD/bookstore_6.txt", "SDD/coupa_0.txt", "SDD/coupa_1.txt",
+             "SDD/coupa_2.txt", "SDD/coupa_3.txt", "SDD/deathCircle_0.txt", "SDD/deathCircle_1.txt", "SDD/deathCircle_2.txt",
+             "SDD/deathCircle_3.txt", "SDD/deathCircle_4.txt"]
+    path_ = "./data/train/"
+    # dataset = DatasetFromTxt(path_, files, cfg)
+    # pix_to_image = dataset.cfg["zara3_pix_to_image_cfg"]
+    # pix_to_m = dataset.cfg['zara_h']
+    # pix_to_image = dataset.cfg["students_pix_to_image_cfg"]
+    # pix_to_m = dataset.cfg['student_h']
+    # pix_to_m = dataset.cfg['student_h']
 
-    files = ["stanford/bookstore_0.txt", "stanford/bookstore_1.txt", "stanford/bookstore_2.txt",
-             "stanford/bookstore_3.txt", "stanford/coupa_3.txt", "stanford/deathCircle_0.txt",
-             "stanford/deathCircle_1.txt", "stanford/deathCircle_2.txt",
-             "stanford/deathCircle_3.txt", "stanford/deathCircle_4.txt",
-             "stanford/gates_0.txt", "stanford/gates_1.txt", "stanford/gates_3.txt", "stanford/gates_4.txt",
-             "stanford/gates_5.txt", "stanford/gates_6.txt", "stanford/gates_7.txt", "stanford/gates_8.txt",
-             "stanford/hyang_5.txt", "stanford/hyang_6.txt", "stanford/hyang_7.txt", "stanford/hyang_9.txt",
-             "stanford/nexus_1.txt", "stanford/nexus_3.txt", "stanford/nexus_4.txt", "stanford/nexus_7.txt",
-             "stanford/nexus_8.txt", "stanford/nexus_9.txt"]
 
-    path_ = "../data/train/"
-    dataset = DatasetFromTxt(path_, files, cfg, use_forces=True, forces_file="forces_19.02.txt")
+    # pix_to_image = dataset.cfg["eth_hotel_pix_to_image_cfg"]
+    # # pix_to_m = dataset.cfg['eth_hotel_h']
+    # # pix_to_image = dataset.cfg["eth_univ_pix_to_image_cfg"]
+    # # pix_to_m = dataset.cfg['eth_univ_h']
+    # img = dataset[0]["img"]
+    #
+    # cfg["raster_params"]["use_map"] = False
+    # cfg["raster_params"]["normalize"] = False
+    # dataset = DatasetFromTxt(path_, files, cfg)
+    # img_pil = Image.fromarray(np.asarray(img, dtype="uint8"))
+    #
+    # bord = 400
+    # img_pil = ImageOps.expand(img_pil, (bord, bord))
+    # draw = ImageDraw.Draw(img_pil)
+    #
+    # R = 2
+    #
+    # for i in range(0, len(dataset), 80):
+    #     data = dataset[i]
+    #     agent_history = data["agent_hist"][:, :2]
+    #     agent_history = transform_points(agent_history, np.linalg.inv(pix_to_m["scale"]))
+    #     for number, pose in enumerate(agent_history):
+    #         if data["agent_hist_avail"][number]:
+    #             draw.ellipse((pix_to_image["coef_x"] * pose[0] - R + pix_to_image["displ_x"] + bord,
+    #                           pix_to_image["coef_y"] * pose[1] - R + pix_to_image["displ_y"] + bord,
+    #                           pix_to_image["coef_x"] * pose[0] + R + pix_to_image["displ_x"] + bord,
+    #                           pix_to_image["coef_y"] * pose[1] + R + pix_to_image["displ_y"] + bord
+    #                           ), fill='blue', outline='blue')
+    #
+    # img_pil.show()
 
 
     #### VISUALIZE TRAJECTORIES
 
     # radius of point to be plotted
     Rad = 2
-    path_to_save = "/home/robot/repos/SDD_forces/192_192_f_n/"
+    cfg["raster_params"]["use_map"] = True
+    cfg["raster_params"]["normalize"] = True
+    dataset = DatasetFromTxt(path_, files, cfg)
+    # path_to_save = "/home/robot/repos/SDD_forces/192_192_f_n/"
     for i in tqdm(range(0, len(dataset))):
-        data = dataset[i]
-        # np.save(path_to_save+str(i), data)
-        # continue
-        #
-        # if data["img"] is np.array([None]):
-        #     continue
+        ind = int(np.random.rand() * len(dataset))
+        data = dataset[ind]
+
         img = Image.fromarray(np.asarray(data["img"], dtype="uint8"))
         draw = ImageDraw.Draw(img)
-        # if np.sum(data["target_avil"]) >= 3:
-        #     continue
 
         if draw_a_h:
             for num, pose in enumerate(data["agent_hist"]):
@@ -78,12 +115,16 @@ if __name__ == "__main__":
                     # pose = data["glob_to_local"] @ np.array([pose[0], pose[1], 1.])
                     pose_raster = data["raster_from_agent"] @ np.array([pose[0], pose[1], 1.])
                     draw.ellipse((pose_raster[0] - Rad, pose_raster[1] - Rad, pose_raster[0] + Rad, pose_raster[1] + Rad), fill='#33cc33', outline='#33cc33')
-        data["img"] = np.asarray(img)
-        np.save(path_to_save + str(i), data)
-        if once:
-            once = False
-            plt.imshow(img)
-            plt.savefig(path_to_save+str(i)+".jpg")
-        # plt.close()
-        # exit()
-        # plt.show()
+        img.show()
+        print()
+        pass
+        pass
+        # data["img"] = np.asarray(img)
+        # np.save(path_to_save + str(i), data)
+        # if once:
+        #     once = False
+        #     plt.imshow(img)
+        #     plt.savefig(path_to_save+str(i)+".jpg")
+        # # plt.close()
+        # # exit()
+        # # plt.show()

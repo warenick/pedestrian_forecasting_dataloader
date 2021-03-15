@@ -65,30 +65,44 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         hist_avail = (time_sorted_hist[:, :, 0] != -1).astype(int)
         neighb_future_avail = (time_sorted_future[:, :, 0] != -1).astype(int)
         img = self.loader.get_map(dataset_index, ped_id, ts)
-        if not self.cfg["raster_params"]["use_map"]:
 
-            # if self.cfg["raster_params"]["normalize"]:
+        if not self.cfg["raster_params"]["use_map"]:
             if "zara" in file:
                 pix_to_m = self.cfg["zara_h"]
+                agent_history[:, 2:] = transform_points(agent_history[:, 2:], np.linalg.inv(pix_to_m["scale"]))
+                agent_future[:, 2:] = transform_points(agent_future[:, 2:], np.linalg.inv(pix_to_m["scale"]))
+                time_sorted_hist[:, :, self.loader.coors_row] = transform_points(time_sorted_hist[:, :, self.loader.coors_row], np.linalg.inv(pix_to_m["scale"]))
             elif "students" in file:
                 pix_to_m = self.cfg["student_h"]
-            elif "eth" in file:
-                pix_to_m = {"scale": np.eye(3)}
-            elif "stanford" in file:
+                agent_history[:, 2:] = transform_points(agent_history[:, 2:], np.linalg.inv(pix_to_m["scale"]))
+                agent_future[:, 2:] = transform_points(agent_future[:, 2:], np.linalg.inv(pix_to_m["scale"]))
+                time_sorted_hist[:, :, self.loader.coors_row] = transform_points(
+                    time_sorted_hist[:, :, self.loader.coors_row], np.linalg.inv(pix_to_m["scale"]))
+            elif ("stanford" in file) or ("SDD" in file):
                 dataset = file[file.index("/") + 1:file.index(".")]
                 pix_to_m = np.eye(3) * self.cfg['SDD_scales'][dataset]["scale"]
                 pix_to_m = {"scale": pix_to_m}
             elif "biwi_eth" in file:
                 pix_to_m = self.cfg['eth_univ_h']
-            else:
-                raise NotImplemented
+                agent_history[:, 2:] = transform_points(agent_history[:, 2:], np.linalg.inv(pix_to_m["scale"]))
+                agent_future[:, 2:] = transform_points(agent_future[:, 2:], np.linalg.inv(pix_to_m["scale"]))
+                time_sorted_hist[:, :, self.loader.coors_row] = transform_points(time_sorted_hist[:, :, self.loader.coors_row],
+                                                np.linalg.inv(pix_to_m["scale"]))
+            elif "eth_hotel" in file:
+                pix_to_m = self.cfg['eth_hotel_h']
+                agent_history[:, 2:] = transform_points(agent_history[:, 2:], np.linalg.inv(pix_to_m["scale"]))
+                agent_future[:, 2:] = transform_points(agent_future[:, 2:], np.linalg.inv(pix_to_m["scale"]))
+                time_sorted_hist[:, :, self.loader.coors_row] = transform_points(
+                    time_sorted_hist[:, :, self.loader.coors_row],
+                    np.linalg.inv(pix_to_m["scale"]))
+
             agent_history = transform_points(agent_history[:, 2:], pix_to_m["scale"])
+            agent_future = transform_points(agent_future[:, 2:], pix_to_m["scale"])
             if self.cfg["raster_params"]["normalize"]:
                 translation = 1 * agent_history[0]
             else:
                 translation = np.zeros(2)
             agent_history -= translation
-            agent_future = transform_points(agent_future[:, 2:], pix_to_m["scale"])
             agent_future -= translation
 
             # time_sorted_future[:,:,2:] -= translation
@@ -134,37 +148,61 @@ class DatasetFromTxt(torch.utils.data.Dataset):
             #             }
 
         # if map:
-        if "crowds" in file or "eth" in file:
-            if self.cfg["raster_params"]["normalize"]:
-                # draw
-
-                pix_to_image = {}
-                pix_to_m = np.eye(3)
-                if "zara" in file:
+        if "UCY" in file or "eth" in file:
+            pix_to_image = {}
+            pix_to_m = np.eye(3)
+            if "zara" in file:
+                img_pil = Image.fromarray(np.asarray(img, dtype="uint8"))
+                if "zara02" in file:
                     pix_to_image = self.cfg["zara2_pix_to_image_cfg"]
-                    pix_to_m = self.cfg["zara_h"]
-                elif "students" in file:
-                    pix_to_image = self.cfg["students_pix_to_image_cfg"]
-                    pix_to_m = self.cfg["student_h"]
-                elif "biwi_eth" in file:
-                    pix_to_image = self.cfg["eth_univ_pix_to_image_cfg"]
-                    pix_to_m = self.cfg['eth_univ_h']
-                    img_pil = Image.fromarray(np.asarray(img, dtype="uint8"))
-                    img_pil = img_pil.resize([int(640 * 1.3), int(480 * 1.3)])
-                    img_pil = img_pil.rotate(90, center=(img_pil.size[0] / 2, img_pil.size[1] / 2))
-                    img = np.asarray(img_pil, dtype="uint8")
-                    agent_history[:, 2:] = transform_points(agent_history[:, 2:], np.linalg.inv(pix_to_m["scale"]))
-                elif "eth_hotel" in file:
-                    pix_to_image = self.cfg["eth_hotel_pix_to_image_cfg"]
-                    pix_to_m = self.cfg['eth_hotel_h']
-                    img_pil = Image.fromarray(np.asarray(img, dtype="uint8"))
-                    img_pil = img_pil.resize([int(640 * 1.3), int(480 * 1.3)])
-                    img_pil = img_pil.rotate(90, center=(img_pil.size[0] / 2, img_pil.size[1] / 2))
-                    img = np.asarray(img_pil, dtype="uint8")
-                    agent_history[:, 2:] = transform_points(agent_history[:, 2:], np.linalg.inv(pix_to_m["scale"]))
-                else:
-                    raise NotImplemented
+                elif "zara01" in file:
 
+                    pix_to_image = self.cfg["zara1_pix_to_image_cfg"]
+                else:
+                    pix_to_image = self.cfg["zara3_pix_to_image_cfg"]
+                    img_pil = img_pil.resize([int(img_pil.size[0] * 0.8), int(img_pil.size[1] * 0.8)])
+                pix_to_m = self.cfg["zara_h"]
+
+                if not "zara03" in file:
+                    img_pil = img_pil.rotate(90, expand=1, center=(img_pil.size[0] / 2, img_pil.size[1] / 2))
+                img = np.asarray(img_pil, dtype="uint8")
+                agent_history[:, 2:] = transform_points(agent_history[:, 2:], np.linalg.inv(pix_to_m["scale"]))
+                agent_future[:, 2:] = transform_points(agent_future[:, 2:], np.linalg.inv(pix_to_m["scale"]))
+                time_sorted_hist[:, :, self.loader.coors_row] = transform_points(
+                    time_sorted_hist[:, :, self.loader.coors_row], np.linalg.inv(pix_to_m["scale"]))
+            elif "students" in file:
+                pix_to_image = self.cfg["students_pix_to_image_cfg"]
+                pix_to_m = self.cfg["student_h"]
+                agent_history[:, 2:] = transform_points(agent_history[:, 2:], np.linalg.inv(pix_to_m["scale"]))
+                agent_future[:, 2:] = transform_points(agent_future[:, 2:], np.linalg.inv(pix_to_m["scale"]))
+                time_sorted_hist[:, :, self.loader.coors_row] = transform_points(
+                    time_sorted_hist[:, :, self.loader.coors_row], np.linalg.inv(pix_to_m["scale"]))
+            elif "biwi_eth" in file:
+                pix_to_image = self.cfg["eth_univ_pix_to_image_cfg"]
+                pix_to_m = self.cfg['eth_univ_h']
+                img_pil = Image.fromarray(np.asarray(img, dtype="uint8"))
+                img_pil = img_pil.rotate(90, expand=1, center=(img_pil.size[0] / 2, img_pil.size[1] / 2))
+                img_pil = img_pil.resize([int(img_pil.size[0] * 1.3), int(img_pil.size[1] * 1)])
+                img = np.asarray(img_pil, dtype="uint8")
+                agent_history[:, 2:] = transform_points(agent_history[:, 2:], np.linalg.inv(pix_to_m["scale"]))
+                agent_future[:, 2:] = transform_points(agent_future[:, 2:], np.linalg.inv(pix_to_m["scale"]))
+                time_sorted_hist[:, :, self.loader.coors_row] = transform_points(
+                    time_sorted_hist[:, :, self.loader.coors_row], np.linalg.inv(pix_to_m["scale"]))
+            elif "eth_hotel" in file:
+                pix_to_image = self.cfg["eth_hotel_pix_to_image_cfg"]
+                pix_to_m = self.cfg['eth_hotel_h']
+                img_pil = Image.fromarray(np.asarray(img, dtype="uint8"))
+                img_pil = img_pil.rotate(90, expand=0, center=(img_pil.size[0] / 2, img_pil.size[1] / 2))
+                img_pil = img_pil.resize([int(img_pil.size[0] * 2), int(img_pil.size[1] * 2)])
+                img = np.asarray(img_pil, dtype="uint8")
+                agent_history[:, 2:] = transform_points(agent_history[:, 2:], np.linalg.inv(pix_to_m["scale"]))
+                agent_future[:, 2:] = transform_points(agent_future[:, 2:], np.linalg.inv(pix_to_m["scale"]))
+                time_sorted_hist[:, :, self.loader.coors_row] = transform_points(
+                    time_sorted_hist[:, :, self.loader.coors_row], np.linalg.inv(pix_to_m["scale"]))
+            else:
+                raise NotImplemented
+
+            if self.cfg["raster_params"]["normalize"]:
                 img_pil = Image.fromarray(np.asarray(img, dtype="uint8"))
                 border_width = 600
                 img_pil = ImageOps.expand(img_pil, (border_width, border_width))
@@ -284,7 +322,7 @@ class DatasetFromTxt(torch.utils.data.Dataset):
                        "forces": forces}
                 return res
 
-        if "stanford" in file:
+        if ("stanford" in file) or ("SDD" in file):
             if self.cfg["raster_params"]["normalize"]:
                 res = self.crop_and_normilize(agent_future, agent_hist_avail, agent_history, file, hist_avail, img,
                                               target_avil, time_sorted_hist, forces)

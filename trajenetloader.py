@@ -1,5 +1,5 @@
 import numpy as np
-
+from tqdm import tqdm
 
 class TrajnetLoader:
 
@@ -8,17 +8,20 @@ class TrajnetLoader:
         self.data_files = data_files
         self.path = path
         self.index_row = 1
-        self.delta_t = {"biwi": 1/25,
+        self.delta_t = {"biwi": 1 / 25,
                         "biwi_eth": 1 / 15,
                         "eth_hotel": 1 / 15,
-                        "mot": 2,
-                        "crowds": 1/25,
-                        "students": 1/25,
-                        "stanford": 1/30,
+                        "UCY": 1 / 25,
+                        "stanford": 1 / 30,
+                        "SDD": 1 / 30,
+                        # "crowds": 1 / 25,
+                        # "students": 1 / 25,
                         }  # 10*msec
 
         self.delta_timestamp = {"stanford": 12,
-                                "crowds": 10,
+                                "SDD": 12,
+                                # "crowds": 10,
+                                "UCY": 10,
                                 "biwi_eth": 6,
                                 "eth_hotel": 6,
                                 }
@@ -31,8 +34,19 @@ class TrajnetLoader:
         self.data_len = 0
         self.sub_data_len = [0]
         self.cfg = cfg
-        for file in data_files:
-            self.data[file] = np.genfromtxt(path + "/" + file, delimiter='')
+        print("loading files")
+        for file in tqdm(data_files):
+
+            if "SDD" in file:
+                self.data[file] = np.genfromtxt(path + "/" + file, delimiter='')
+                self.data[file] = self.data[file][
+                    (self.data[file][:, 5] + (self.data[file][:, 5].min() % 12)) % 12 == 0]
+                self.data[file] = self.data[file][:, (5, 0, 1, 2, 3, 4)]
+                self.data[file][:, 2] = (self.data[file][:, 2] + self.data[file][:, 4]) / 2
+                self.data[file][:, 3] = (self.data[file][:, 3] + self.data[file][:, 5]) / 2
+                self.data[file] = self.data[file][:, :4]
+            else:
+                self.data[file] = np.genfromtxt(path + "/" + file, delimiter='')
             self.data_len += len(self.data[file])
             self.sub_data_len.append(self.data_len)
 
@@ -59,7 +73,9 @@ class TrajnetLoader:
 
         file = self.data_files[dataset_ind]
         data = self.data[file]
-        start_ts = timestamp - (self.history_len / self.delta_t[file[0:file.index("/")]]) #*self.delta_t[file[0:file.index("/")]])
+
+        start_ts = timestamp - (
+                    self.history_len / self.delta_t[file[0:file.index("/")]])  # *self.delta_t[file[0:file.index("/")]])
         #         if self.cfg["raster_params"]["use_map"] == True:
 
         data = data[data[:, self.index_row] == ped_id]  # filter by index
@@ -68,13 +84,18 @@ class TrajnetLoader:
         # out = np.zeros((self.history_len + 1, 4)) - 1
         if "eth" in file:
             data = data[:, (0, 1, 2, 4)]
-        timecoef = self.delta_timestamp[file[0:file.index("/")]]*self.delta_t[file[0:file.index("/")]]
+        if ("zara01" in file) or ("zara02" in file):
+            data = data[:, (0, 1, 2, 4)]
+        # if ("SDD" in file):
+
+        # if ("students03" in file):
+        #     data = data[:, (0, 1, 2, 4)]
+        timecoef = self.delta_timestamp[file[0:file.index("/")]] * self.delta_t[file[0:file.index("/")]]
         out = np.zeros((int(self.history_len / timecoef), 4)) - 1
         out[0:len(data), :] = np.flip(data, axis=0)
         return out
 
     def get_agent_future(self, dataset_ind: int, ped_id: int, timestamp: float) -> np.array:
-
         """
          :param dataset_ind: index of file
          :param ped_id: ID of agent
@@ -83,14 +104,18 @@ class TrajnetLoader:
         """
 
         file = self.data_files[dataset_ind]
-        end_timestamp = timestamp + (self.pred_len / self.delta_t[file[0:file.index("/")]])  # self.delta_t[file[0:file.index("/")]])
+        end_timestamp = timestamp + (
+                    self.pred_len / self.delta_t[file[0:file.index("/")]])  # self.delta_t[file[0:file.index("/")]])
         data = self.data[file]
         data = data[data[:, self.index_row] == ped_id]  # filter by index
         data = data[(data[:, self.ts_row] <= end_timestamp)]  # filter by timestamp
         data = data[data[:, self.ts_row] > timestamp]
         if "eth" in file:
             data = data[:, (0, 1, 2, 4)]
-        # out = np.zeros((self.pred_len, 4)) - 1
+        if ("zara01" in file) or ("zara02" in file):
+            data = data[:, (0, 1, 2, 4)]
+        # if ("students03" in file):
+        #     data = data[:, (0, 1, 2, 4)]
         timecoef = self.delta_timestamp[file[0:file.index("/")]] * self.delta_t[file[0:file.index("/")]]
         out = np.zeros((int(round(self.pred_len / timecoef)), 4)) - 1
         out[0:len(data), :] = np.array(data)
@@ -136,7 +161,7 @@ class TrajnetLoader:
         img = None
         if self.cfg["raster_params"]["use_map"]:
             txt_file = self.data_files[dataset_ind]
-            if not "eth" in txt_file:
+            if ("eth" not in txt_file) and ("UCY" not in txt_file):
                 img_file = self.path + txt_file[0:txt_file.index(".")] + ".jpg"
             else:
                 img_file = self.path + txt_file[0:txt_file.index(".")] + ".png"
