@@ -4,17 +4,27 @@ from PIL import Image, ImageDraw, ImageOps
 from torch.utils.data import DataLoader
 
 import sys
-sys.path.insert(0, './')
-from force_from_txt import Force_from_txt
-from trajenetloader import TrajnetLoader
-from utils import crop_image_crowds
-from utils import trajectory_orientation, rotate_image
+# sys.path.insert(0, './')
+try:
+    from force_from_txt import Force_from_txt
+    from trajenetloader import TrajnetLoader
+    from utils import crop_image_crowds
+    from utils import trajectory_orientation, rotate_image
+    from utils import sdd_crop_and_rotate, transform_points
+    from config import cfg
+except:
+    # relative import
+    from .force_from_txt import Force_from_txt
+    from .trajenetloader import TrajnetLoader
+    from .utils import crop_image_crowds
+    from .utils import trajectory_orientation, rotate_image
+    from .utils import sdd_crop_and_rotate, transform_points
+    from .config import cfg
+
 import math
 from tqdm import tqdm
 
-from config import cfg
 
-from utils import sdd_crop_and_rotate, transform_points
 
 torch.multiprocessing.set_sharing_strategy('file_system')
 
