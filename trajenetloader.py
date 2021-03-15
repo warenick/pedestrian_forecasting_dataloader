@@ -9,7 +9,8 @@ class TrajnetLoader:
         self.path = path
         self.index_row = 1
         self.delta_t = {"biwi": 1/25,
-                        "biwi_eth": 1 / 25,
+                        "biwi_eth": 1 / 15,
+                        "eth_hotel": 1 / 15,
                         "mot": 2,
                         "crowds": 1/25,
                         "students": 1/25,
@@ -18,7 +19,8 @@ class TrajnetLoader:
 
         self.delta_timestamp = {"stanford": 12,
                                 "crowds": 10,
-                                "biwi_eth": 10,
+                                "biwi_eth": 6,
+                                "eth_hotel": 6,
                                 }
         self.ts_row = 0  # timestamp row
         self.coors_row = [2, 3]
@@ -64,6 +66,8 @@ class TrajnetLoader:
         data = data[(data[:, self.ts_row] > start_ts)]  # filter by timestamp
         data = data[data[:, self.ts_row] <= timestamp]
         # out = np.zeros((self.history_len + 1, 4)) - 1
+        if "eth" in file:
+            data = data[:, (0, 1, 2, 4)]
         timecoef = self.delta_timestamp[file[0:file.index("/")]]*self.delta_t[file[0:file.index("/")]]
         out = np.zeros((int(self.history_len / timecoef), 4)) - 1
         out[0:len(data), :] = np.flip(data, axis=0)
@@ -84,6 +88,8 @@ class TrajnetLoader:
         data = data[data[:, self.index_row] == ped_id]  # filter by index
         data = data[(data[:, self.ts_row] <= end_timestamp)]  # filter by timestamp
         data = data[data[:, self.ts_row] > timestamp]
+        if "eth" in file:
+            data = data[:, (0, 1, 2, 4)]
         # out = np.zeros((self.pred_len, 4)) - 1
         timecoef = self.delta_timestamp[file[0:file.index("/")]] * self.delta_t[file[0:file.index("/")]]
         out = np.zeros((int(round(self.pred_len / timecoef)), 4)) - 1
@@ -130,7 +136,10 @@ class TrajnetLoader:
         img = None
         if self.cfg["raster_params"]["use_map"]:
             txt_file = self.data_files[dataset_ind]
-            img_file = self.path + txt_file[0:txt_file.index(".")] + ".jpg"
+            if not "eth" in txt_file:
+                img_file = self.path + txt_file[0:txt_file.index(".")] + ".jpg"
+            else:
+                img_file = self.path + txt_file[0:txt_file.index(".")] + ".png"
             img = cv2.imread(img_file).astype(np.int16)
             # img = Image.open(img_file)
             # img = np.asarray(img, dtype="int32")

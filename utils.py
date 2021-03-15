@@ -106,10 +106,12 @@ def crop_image_crowds(img, cfg, agent_center_img: np.array, transform, rot_mat, 
     agent_center_m = (transform @ np.array([agent_center_img[0], agent_center_img[1], 1]))
 
     orientation = 1
-    if "students" in file:
+    if ("students" in file):
         orientation = -1
         rot_mat = np.linalg.inv(rot_mat)
-    tl_disp = rot_mat @ (np.array([ orientation*cfg["agent_center"][0]* cfg["image_area_meters"][0],
+    if "eth" in file:
+        orientation = -1
+    tl_disp = rot_mat @ (np.array([orientation*cfg["agent_center"][0]* cfg["image_area_meters"][0],
                          -cfg["agent_center"][1] * cfg["image_area_meters"][1],
                          1]))
 
@@ -127,6 +129,7 @@ def crop_image_crowds(img, cfg, agent_center_img: np.array, transform, rot_mat, 
     cropped = img.crop((min(tl[0], br[0]), min(tl[1], br[1]), max(tl[0], br[0]), max(tl[1], br[1])))
     image_resize_coef = [cfg["image_shape"][0] / cropped.size[0], cfg["image_shape"][1] / cropped.size[1]]
     cropped = cropped.resize(cfg["image_shape"])
+    # cropped.show()
     return cropped, image_resize_coef
 
 

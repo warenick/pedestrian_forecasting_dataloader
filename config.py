@@ -243,6 +243,42 @@ students_pix_to_image_cfg = {
     "coef_y": -1
 }
 
+# eth_univ_pix_to_image_cfg = {
+#     "displ_y": -(400)//2,
+#     "displ_x": -(480)//2,
+#     "coef_x": 1,
+#     "coef_y": 1
+# }
+# eth_univ_pix_to_image_cfg = {
+#     "displ_y": (1520)//2,
+#     "displ_x": -(320)//2,
+#     "coef_x": 1,
+#     "coef_y": -1
+# }
+
+# 640 480
+# eth_univ_pix_to_image_cfg = {
+#     "displ_y": -(640)//2,
+#     "displ_x": -(320)//2,
+#     "coef_x": 1,
+#     "coef_y": 1
+# }
+
+eth_univ_pix_to_image_cfg = {
+    "displ_y": -(160)//2,
+    "displ_x": (250)//2,
+    "coef_x": 1,
+    "coef_y": 1
+}
+
+
+eth_hotel_pix_to_image_cfg = {
+    "displ_y": 650//2,
+    "displ_x": (950)//2,
+    "coef_x": 1,
+    "coef_y": 1
+}
+
 zara2_pix_to_image_cfg = {
     "displ_y": (576+22)//2,
     "displ_x": (720)//2,
@@ -259,11 +295,24 @@ student_cfg = {"scale": np.array([[0.02104651,  0.,         7.57676355],
                                   [0.,         0.,         1.]])
                }  # pix to meters! pixels from [-359, -288] to [359, 288] !!!
 
+eth_univ_cfg = {"scale": np.array([[2.8128700e-02,   2.0091900e-03,  -4.6693600e+00],
+                                   [8.0625700e-04,   2.5195500e-02,  -5.0608800e+00],
+                                   [0,   0,   1]])} # /4.6255300e-01
 
+eth_hotel_cfg = {"scale": np.array([[1.1048200e-02,   6.6958900e-04,  -3.3295300e+00],
+                                   [-1.5966000e-03,   1.1632400e-02,  -5.3951400e+00],
+                                   [1.1190700e-24,   1.3617400e-25,   1]])} # /5.4276600e-01
+
+# 6.6958900e-04 - 3.3295300e+00
+# -1.5966000e-03
+# 1.1632400e-02 - 5.3951400e+00
+# 1.1190700e-04
+# 1.3617400e-05
+# 5.4276600e-01
 cropping_cfg = {
     "agent_center": [0.25, 0.5],
     "image_area_meters": [15, 15],
-    "image_shape": [192, 192],
+    "image_shape": [480, 480],
 }
 
 cfg = {
@@ -295,11 +344,15 @@ cfg = {
         'train': 1,
         'predict': 0,
     },
+
     "SDD_scales": SDD_scales,
     "zara_h": zara_cfg,
     "student_h": student_cfg,
+    "eth_univ_h": eth_univ_cfg,
+    "eth_hotel_h": eth_hotel_cfg,
     "cropping_cfg": cropping_cfg,
     "students_pix_to_image_cfg": students_pix_to_image_cfg,
+    "eth_univ_pix_to_image_cfg": eth_univ_pix_to_image_cfg,
     "zara2_pix_to_image_cfg": zara2_pix_to_image_cfg,
-
+    "eth_hotel_pix_to_image_cfg": eth_hotel_pix_to_image_cfg,
 }
