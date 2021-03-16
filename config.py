@@ -74,6 +74,20 @@ SDD_scales = {
         "certainty": 0.9,
     },
 
+
+    "little_0": {
+      "scale": 0.028930169
+    },
+    "little_1": {
+          "scale": 0.028543144
+        },
+    "little_2": {
+          "scale": 0.028543144
+        },
+    "little_3": {
+          "scale": 0.028638926
+        },
+
     "gates_0": {
         "scale": 0.038980137,
         "certainty": 0.9,
@@ -327,7 +341,7 @@ cfg = {
     "files": ["biwi/biwi_hotel.txt", "mot/PETS09-S2L1.txt"],
     'raster_params': {
         "draw_hist": True,
-        "use_map": False,
+        "use_map": True,
         "normalize": False,
         # 'raster_size': [224, 224],
         # 'pixel_size': [0.5, 0.5],
