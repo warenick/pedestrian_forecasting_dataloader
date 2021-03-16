@@ -1,6 +1,7 @@
 import numpy as np
 from tqdm import tqdm
 
+
 class TrajnetLoader:
 
     def __init__(self, path, data_files, cfg):
@@ -38,7 +39,13 @@ class TrajnetLoader:
         for file in tqdm(data_files):
 
             if "SDD" in file:
-                self.data[file] = np.genfromtxt(path + "/" + file, delimiter='')
+                try:
+                    name = path + "/" + file
+                    new_name = name[:name.index(".")] + ".npy"
+                    self.data[file] = np.load(new_name)
+                except:
+                    self.data[file] = np.loadtxt(path + "/" + file, delimiter=' ', usecols=[0, 1, 2, 3, 4, 5])
+
                 self.data[file] = self.data[file][
                     (self.data[file][:, 5] + (self.data[file][:, 5].min() % 12)) % 12 == 0]
                 self.data[file] = self.data[file][:, (5, 0, 1, 2, 3, 4)]
@@ -75,7 +82,7 @@ class TrajnetLoader:
         data = self.data[file]
 
         start_ts = timestamp - (
-                    self.history_len / self.delta_t[file[0:file.index("/")]])  # *self.delta_t[file[0:file.index("/")]])
+                self.history_len / self.delta_t[file[0:file.index("/")]])  # *self.delta_t[file[0:file.index("/")]])
         #         if self.cfg["raster_params"]["use_map"] == True:
 
         data = data[data[:, self.index_row] == ped_id]  # filter by index
@@ -105,7 +112,7 @@ class TrajnetLoader:
 
         file = self.data_files[dataset_ind]
         end_timestamp = timestamp + (
-                    self.pred_len / self.delta_t[file[0:file.index("/")]])  # self.delta_t[file[0:file.index("/")]])
+                self.pred_len / self.delta_t[file[0:file.index("/")]])  # self.delta_t[file[0:file.index("/")]])
         data = self.data[file]
         data = data[data[:, self.index_row] == ped_id]  # filter by index
         data = data[(data[:, self.ts_row] <= end_timestamp)]  # filter by timestamp

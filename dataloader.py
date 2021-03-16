@@ -137,6 +137,7 @@ class DatasetFromTxt(torch.utils.data.Dataset):
                     "loc_im_to_glob": np.eye(3),
                     "file": file[file.index("/") + 1:]
                     }
+
             # if not self.cfg["raster_params"]["normalize"]:
             #     agent_history, neigh_localM = self.calc_speed_accel(agent_history[:, self.loader.coors_row], time_sorted_hist)
             #     return {"img": None,
@@ -329,7 +330,13 @@ class DatasetFromTxt(torch.utils.data.Dataset):
                        "neighb_avail": hist_avail,
                        "glob_to_local": None,
                        "image_to_local": None,
+                       "raster_from_agent": None,
+                       "raster_from_world": None,  # raster_from_world,
+                       "world_from_agent": None,  # world_from_agent,
+                       "agent_from_world": None,  # agent_from_world
+                       "loc_im_to_glob": None,
                        "forces": forces}
+
                 return res
 
         if ("stanford" in file) or ("SDD" in file):
@@ -730,8 +737,8 @@ if __name__ == "__main__":
     # ind = int(1000 * torch.rand(1).item())
     # data = dataset[ind]
 
-    cfg["raster_params"]["use_map"] = True
-    cfg["raster_params"]["normalize"] = True
+    cfg["raster_params"]["use_map"] = False
+    cfg["raster_params"]["normalize"] = False
     files = [  # "biwi_eth/biwi_eth.txt",
         "UCY/zara01/zara01.txt",
         # "crowds/students001.txt",        "crowds/students003.txt",
@@ -747,7 +754,7 @@ if __name__ == "__main__":
     dataloader = DataLoader(dataset, batch_size=128,
                             shuffle=False, num_workers=8, collate_fn=collate_wrapper)
 
-    threshold = 40
+    threshold = 400
     speeds_zara = np.zeros(0)
     for i, data in enumerate((dataloader)):
         speed = np.linalg.norm(data.history_positions[:, :, 2:4], axis=2)[data.history_av == 1].reshape(-1)
@@ -794,8 +801,6 @@ if __name__ == "__main__":
             print("eth_hotel wo_norm speed average:", np.mean(speeds_eth_hot))
             break
 
-
-
     cfg["raster_params"]["use_map"] = False
     cfg["raster_params"]["normalize"] = False
     files = ["biwi_eth/biwi_eth.txt"]
@@ -803,15 +808,15 @@ if __name__ == "__main__":
     dataloader = DataLoader(dataset, batch_size=128,
                             shuffle=False, num_workers=8, collate_fn=collate_wrapper)
     speeds_biwi_eth = np.zeros(0)
-    for i, data in enumerate((dataloader)):
+    for i, data in enumerate(dataloader):
         speed = np.linalg.norm(data.history_positions[:, :, 2:4], axis=2)[data.history_av == 1].reshape(-1)
         speeds_biwi_eth = np.concatenate((speeds_biwi_eth, speed[speed>1e-6]))
         if i > threshold:
             print("biwi_eth speed average:", np.mean(speeds_biwi_eth))
             break
 
-    cfg["raster_params"]["use_map"] = True
-    cfg["raster_params"]["normalize"] = True
+    cfg["raster_params"]["use_map"] = False
+    cfg["raster_params"]["normalize"] = False
     files = [  # "biwi_eth/biwi_eth.txt",
         # "crowds/crowds_zara02.txt", "crowds/crowds_zara03.txt", "crowds/students001.txt",
         # "crowds/students003.txt",
@@ -833,17 +838,6 @@ if __name__ == "__main__":
             print("stanf speed average:", np.mean(speed))
             break
     n_bins = 20
-    # axs[0, 0].hist(speeds_zara, bins=n_bins)
-    # axs[0, 0].set_ylabel("zara")
-    # axs[0, 0].set_xlabel("speed")
-    # axs[0, 1].hist(speeds_biwi_eth, bins=n_bins)
-    # axs[0, 1].set_ylabel("biwi_eth")
-    # axs[1, 0].hist(speeds_stanford, bins=n_bins)
-    # axs[1, 0].set_ylabel("stanford")
-    # axs[1, 1].hist(speeds_students, bins=n_bins)
-    # axs[1, 1].set_ylabel("students")
-    # fig.savefig('foo.png')
-    # plt.show()
 
     plt.hist(speeds_zara, n_bins, alpha=0.5, label='speeds_zara')
     plt.hist(speeds_biwi_eth, n_bins, alpha=0.5, label='speeds_biwi_eth')
