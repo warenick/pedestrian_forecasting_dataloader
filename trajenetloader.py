@@ -10,7 +10,7 @@ class TrajnetLoader:
         self.index_row = 1
         self.delta_t = {"biwi": 1 / 25,
                         "biwi_eth": 1 / 15,
-                        "eth_hotel": 1 / 15,
+                        "eth_hotel": 1 / 25,
                         "UCY": 1 / 25,
                         "stanford": 1 / 30,
                         "SDD": 1 / 30,
@@ -23,7 +23,7 @@ class TrajnetLoader:
                                 # "crowds": 10,
                                 "UCY": 10,
                                 "biwi_eth": 6,
-                                "eth_hotel": 6,
+                                "eth_hotel": 10,
                                 }
         self.ts_row = 0  # timestamp row
         self.coors_row = [2, 3]

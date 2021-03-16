@@ -21,12 +21,15 @@ if __name__ == "__main__":
     #
     #
     # # files = ["eth_hotel/eth_hotel.txt"]
-    files = ["SDD/bookstore_0.txt", "SDD/bookstore_1.txt", "SDD/bookstore_2.txt", "SDD/bookstore_3.txt",
-             "SDD/bookstore_4.txt", "SDD/bookstore_5.txt", "SDD/bookstore_6.txt", "SDD/coupa_0.txt", "SDD/coupa_1.txt",
-             "SDD/coupa_2.txt", "SDD/coupa_3.txt", "SDD/deathCircle_0.txt", "SDD/deathCircle_1.txt", "SDD/deathCircle_2.txt",
-             "SDD/deathCircle_3.txt", "SDD/deathCircle_4.txt"]
+    files = [
+            # "SDD/bookstore_0.txt", "SDD/bookstore_1.txt", "SDD/bookstore_2.txt", "SDD/bookstore_3.txt",
+            #  "SDD/bookstore_4.txt", "SDD/bookstore_5.txt", "SDD/bookstore_6.txt", "SDD/coupa_0.txt", "SDD/coupa_1.txt",
+            #  "SDD/coupa_2.txt", "SDD/coupa_3.txt", "SDD/deathCircle_0.txt", "SDD/deathCircle_1.txt", "SDD/deathCircle_2.txt",
+            #  "SDD/deathCircle_3.txt", "SDD/deathCircle_4.txt"
+            "eth_hotel/eth_hotel.txt"
+             ]
     path_ = "./data/train/"
-    # dataset = DatasetFromTxt(path_, files, cfg)
+    dataset = DatasetFromTxt(path_, files, cfg)
     # pix_to_image = dataset.cfg["zara3_pix_to_image_cfg"]
     # pix_to_m = dataset.cfg['zara_h']
     # pix_to_image = dataset.cfg["students_pix_to_image_cfg"]
@@ -51,8 +54,11 @@ if __name__ == "__main__":
     #
     # R = 2
     #
-    # for i in range(0, len(dataset), 80):
-    #     data = dataset[i]
+    for i in range(0, len(dataset), 80):
+        data = dataset[i]
+        if np.sum(data["target_avil"][-1] !=0):
+            print("goals")
+
     #     agent_history = data["agent_hist"][:, :2]
     #     agent_history = transform_points(agent_history, np.linalg.inv(pix_to_m["scale"]))
     #     for number, pose in enumerate(agent_history):
