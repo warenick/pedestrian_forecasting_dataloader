@@ -9,7 +9,7 @@ from torchvision.transforms import Compose, ToTensor, Resize
 from torch.utils.data import DataLoader
 
 def train_val_dataset(dataset, val_split=0.25):
-    train_idx, val_idx = train_test_split(list(range(len(dataset))), test_size=val_split)
+    train_idx, val_idx = train_test_split(list(range(len(dataset))), test_size=val_split, random_state=42)
     datasets = {}
     train = Subset(dataset, train_idx)
     val = Subset(dataset, val_idx)
@@ -39,7 +39,7 @@ def get_train_val_dataloaders(path_, cfg, validate_with, *args):
         elif validate_with == "students":
             train_files = ["eth_hotel/eth_hotel.txt", "UCY/zara02/zara02.txt",
                            "biwi_eth/biwi_eth.txt", "UCY/zara01/zara01.txt"]
-            val_files = ["UCY/students01/students01.txt", "UCY/students01/students03.txt"]
+            val_files = ["UCY/students01/students01.txt", "UCY/students01/students01.txt"]
         else:
             raise NotImplemented
         train_dataset = DatasetFromTxt(path_, train_files, cfg, *args)
