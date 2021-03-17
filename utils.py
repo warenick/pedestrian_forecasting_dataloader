@@ -8,8 +8,11 @@ from PIL import Image, ImageDraw, ImageOps
 import torch
 import matplotlib.pyplot as plt
 
-from config import SDD_scales, cropping_cfg
-
+try:
+    from config import SDD_scales, cropping_cfg
+except:
+    from .config import SDD_scales, cropping_cfg
+    
 
 def transform_points2d(points: np.array, transform: np.array):
     """

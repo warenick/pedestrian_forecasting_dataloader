@@ -1,5 +1,4 @@
-data/
-data_prev/
+data*/
 logs/
 scripts/images/
 *.profile

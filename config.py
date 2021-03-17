@@ -74,6 +74,20 @@ SDD_scales = {
         "certainty": 0.9,
     },
 
+
+    "little_0": {
+      "scale": 0.028930169
+    },
+    "little_1": {
+          "scale": 0.028543144
+        },
+    "little_2": {
+          "scale": 0.028543144
+        },
+    "little_3": {
+          "scale": 0.028638926
+        },
+
     "gates_0": {
         "scale": 0.038980137,
         "certainty": 0.9,
@@ -266,7 +280,7 @@ students_pix_to_image_cfg = {
 
 eth_univ_pix_to_image_cfg = {
     "displ_y": -(160)//2,
-    "displ_x": (250)//2,
+    "displ_x": (-50)//2,
     "coef_x": 1,
     "coef_y": 1
 }
@@ -279,9 +293,22 @@ eth_hotel_pix_to_image_cfg = {
     "coef_y": 1
 }
 
+zara1_pix_to_image_cfg = {
+    "displ_y": (1420+22)//2,
+    "displ_x": (-20)//2,
+    "coef_x": 1,
+    "coef_y": -1
+}
+
+zara3_pix_to_image_cfg = {
+    "displ_y": (680)//2,
+    "displ_x": (620)//2,
+    "coef_x": -1,
+    "coef_y": -1
+}
 zara2_pix_to_image_cfg = {
-    "displ_y": (576+22)//2,
-    "displ_x": (720)//2,
+    "displ_y": 0//2,
+    "displ_x": (-20)//2,
     "coef_x": 1,
     "coef_y": -1
 }
@@ -303,12 +330,6 @@ eth_hotel_cfg = {"scale": np.array([[1.1048200e-02,   6.6958900e-04,  -3.3295300
                                    [-1.5966000e-03,   1.1632400e-02,  -5.3951400e+00],
                                    [1.1190700e-24,   1.3617400e-25,   1]])} # /5.4276600e-01
 
-# 6.6958900e-04 - 3.3295300e+00
-# -1.5966000e-03
-# 1.1632400e-02 - 5.3951400e+00
-# 1.1190700e-04
-# 1.3617400e-05
-# 5.4276600e-01
 cropping_cfg = {
     "agent_center": [0.25, 0.5],
     "image_area_meters": [15, 15],
@@ -320,7 +341,7 @@ cfg = {
     "files": ["biwi/biwi_hotel.txt", "mot/PETS09-S2L1.txt"],
     'raster_params': {
         "draw_hist": True,
-        "use_map": False,
+        "use_map": True,
         "normalize": False,
         # 'raster_size': [224, 224],
         # 'pixel_size': [0.5, 0.5],
@@ -354,5 +375,7 @@ cfg = {
     "students_pix_to_image_cfg": students_pix_to_image_cfg,
     "eth_univ_pix_to_image_cfg": eth_univ_pix_to_image_cfg,
     "zara2_pix_to_image_cfg": zara2_pix_to_image_cfg,
+    "zara3_pix_to_image_cfg": zara3_pix_to_image_cfg,
+    "zara1_pix_to_image_cfg": zara1_pix_to_image_cfg,
     "eth_hotel_pix_to_image_cfg": eth_hotel_pix_to_image_cfg,
 }
