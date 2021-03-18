@@ -341,8 +341,8 @@ cfg = {
     "files": ["biwi/biwi_hotel.txt", "mot/PETS09-S2L1.txt"],
     'raster_params': {
         "draw_hist": True,
-        "use_map": True,
-        "normalize": False,
+        "use_map": False,
+        "normalize": True,
         # 'raster_size': [224, 224],
         # 'pixel_size': [0.5, 0.5],
         # 'ego_center': [0.25, 0.5],
