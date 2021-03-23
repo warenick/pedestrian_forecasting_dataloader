@@ -74,8 +74,10 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         target_avil = (agent_future[:, 0] != -1).astype(int)
         hist_avail = (time_sorted_hist[:, :, 0] != -1).astype(int)
         neighb_future_avail = (time_sorted_future[:, :, 0] != -1).astype(int)
-        img = self.loader.get_map(dataset_index, ped_id, ts)
-
+        img, mask = self.loader.get_map(dataset_index, ped_id, ts)
+        if mask is not None:
+            pass
+            # img = np.concatenate((img, mask.reshape(mask.shape[0], -1, 1)), axis=2)
         if not self.cfg["raster_params"]["use_map"]:
             if "zara" in file:
                 pix_to_m = self.cfg["zara_h"]
@@ -164,6 +166,9 @@ class DatasetFromTxt(torch.utils.data.Dataset):
             pix_to_m = np.eye(3)
             if "zara" in file:
                 img_pil = Image.fromarray(np.asarray(img, dtype="uint8"))
+                mask_pil = None
+                if mask is not None:
+                    mask_pil = Image.fromarray(np.asarray(mask, dtype="uint8"))
                 if "zara02" in file:
                     pix_to_image = self.cfg["zara2_pix_to_image_cfg"]
                 elif "zara01" in file:
@@ -172,15 +177,22 @@ class DatasetFromTxt(torch.utils.data.Dataset):
                 else:
                     pix_to_image = self.cfg["zara3_pix_to_image_cfg"]
                     img_pil = img_pil.resize([int(img_pil.size[0] * 0.8), int(img_pil.size[1] * 0.8)])
+                    if mask is not None:
+                        mask_pil = mask_pil.resize([int(img_pil.size[0] * 0.8), int(img_pil.size[1] * 0.8)],0)
                 pix_to_m = self.cfg["zara_h"]
 
                 if not "zara03" in file:
+                    if mask is not None:
+                        mask_pil = mask_pil.rotate(90, expand=1, center=(img_pil.size[0] / 2, img_pil.size[1] / 2))
                     img_pil = img_pil.rotate(90, expand=1, center=(img_pil.size[0] / 2, img_pil.size[1] / 2))
                 img = np.asarray(img_pil, dtype="uint8")
+                if mask is not None:
+                    mask_np = np.asarray(mask_pil, dtype="uint8")
                 agent_history[:, 2:] = transform_points(agent_history[:, 2:], np.linalg.inv(pix_to_m["scale"]))
                 agent_future[:, 2:] = transform_points(agent_future[:, 2:], np.linalg.inv(pix_to_m["scale"]))
                 time_sorted_hist[:, :, self.loader.coors_row] = transform_points(
                     time_sorted_hist[:, :, self.loader.coors_row], np.linalg.inv(pix_to_m["scale"]))
+
             elif "students" in file:
                 pix_to_image = self.cfg["students_pix_to_image_cfg"]
                 pix_to_m = self.cfg["student_h"]
@@ -188,6 +200,7 @@ class DatasetFromTxt(torch.utils.data.Dataset):
                 agent_future[:, 2:] = transform_points(agent_future[:, 2:], np.linalg.inv(pix_to_m["scale"]))
                 time_sorted_hist[:, :, self.loader.coors_row] = transform_points(
                     time_sorted_hist[:, :, self.loader.coors_row], np.linalg.inv(pix_to_m["scale"]))
+
             elif "biwi_eth" in file:
                 pix_to_image = self.cfg["eth_univ_pix_to_image_cfg"]
                 pix_to_m = self.cfg['eth_univ_h']
@@ -195,6 +208,14 @@ class DatasetFromTxt(torch.utils.data.Dataset):
                 img_pil = img_pil.rotate(90, expand=1, center=(img_pil.size[0] / 2, img_pil.size[1] / 2))
                 img_pil = img_pil.resize([int(img_pil.size[0] * 1.3), int(img_pil.size[1] * 1)])
                 img = np.asarray(img_pil, dtype="uint8")
+                mask_pil = None
+                if mask is not None:
+                    mask_pil = Image.fromarray(np.asarray(mask, dtype="uint8")).rotate(90, expand=1,
+                                                                                       center=(img_pil.size[0] / 2,
+                                                                                               img_pil.size[1] / 2))
+                    mask_pil = mask_pil.resize([int(img_pil.size[0] * 1.3), int(img_pil.size[1] * 1)])
+                    mask_np = np.asarray(mask_pil, dtype="uint8")
+
                 agent_history[:, 2:] = transform_points(agent_history[:, 2:], np.linalg.inv(pix_to_m["scale"]))
                 agent_future[:, 2:] = transform_points(agent_future[:, 2:], np.linalg.inv(pix_to_m["scale"]))
                 time_sorted_hist[:, :, self.loader.coors_row] = transform_points(
@@ -206,6 +227,14 @@ class DatasetFromTxt(torch.utils.data.Dataset):
                 img_pil = img_pil.rotate(90, expand=0, center=(img_pil.size[0] / 2, img_pil.size[1] / 2))
                 img_pil = img_pil.resize([int(img_pil.size[0] * 2), int(img_pil.size[1] * 2)])
                 img = np.asarray(img_pil, dtype="uint8")
+                mask_pil = None
+                if mask is not None:
+                    mask_pil = Image.fromarray(np.asarray(mask, dtype="uint8")).rotate(90, expand=1,
+                                                                                       center=(img_pil.size[0] / 2,
+                                                                                               img_pil.size[1] / 2))
+                    mask_pil = mask_pil.resize([int(img_pil.size[0] * 2), int(img_pil.size[1] * 2)])
+                    mask_np = np.asarray(mask_pil, dtype="uint8")
+
                 agent_history[:, 2:] = transform_points(agent_history[:, 2:], np.linalg.inv(pix_to_m["scale"]))
                 agent_future[:, 2:] = transform_points(agent_future[:, 2:], np.linalg.inv(pix_to_m["scale"]))
                 time_sorted_hist[:, :, self.loader.coors_row] = transform_points(
@@ -215,8 +244,11 @@ class DatasetFromTxt(torch.utils.data.Dataset):
 
             if self.cfg["raster_params"]["normalize"]:
                 img_pil = Image.fromarray(np.asarray(img, dtype="uint8"))
-                border_width = 600
+                border_width = int(abs(img_pil.size[0] - img_pil.size[1])*1.5)
                 img_pil = ImageOps.expand(img_pil, (border_width, border_width))
+                if mask is not None:
+                    mask_pil = Image.fromarray(np.asarray(mask, dtype="uint8"))
+                    mask_pil = ImageOps.expand(mask_pil, (border_width, border_width))
                 if self.cfg["raster_params"]["draw_hist"]:
 
                     draw = ImageDraw.Draw(img_pil)
@@ -244,8 +276,8 @@ class DatasetFromTxt(torch.utils.data.Dataset):
 
                 center = np.array([pix_to_image["coef_x"] * agent_history[0, 2] + pix_to_image["displ_x"],
                                    pix_to_image["coef_y"] * agent_history[0, 3] + pix_to_image["displ_y"]])
-                img_pil, img_to_rotated = rotate_image(img_pil, angle_deg,
-                                                       center=center + np.array([border_width, border_width]))
+                img_pil, img_to_rotated, mask_pil = rotate_image(img_pil, angle_deg,
+                                                       center=center + np.array([border_width, border_width]), mask=mask_pil)
 
                 pix_to_image_matrix = np.array([[pix_to_image["coef_x"], 0, pix_to_image["displ_x"]],
                                                 [0, pix_to_image["coef_y"], pix_to_image["displ_y"]],
@@ -271,9 +303,9 @@ class DatasetFromTxt(torch.utils.data.Dataset):
                 agent_history_m = pix_to_m["scale"] @ np.array([agent_history[0][2], agent_history[0][3], 1])
                 error = Rimage_to_word @ (center_img) - agent_history_m
 
-                crop_img, scale = crop_image_crowds(img_pil, self.cfg["cropping_cfg"],
+                crop_img, scale, mask_pil_crop = crop_image_crowds(img_pil, self.cfg["cropping_cfg"],
                                                     agent_center_img=center_img,
-                                                    transform=Rimage_to_word, rot_mat=to_rot_mat, file=file)
+                                                    transform=Rimage_to_word, rot_mat=to_rot_mat, file=file, mask=mask_pil)
 
                 world_to_agent_matrix = np.eye(3)
                 world_to_agent_matrix[:, 2] = -agent_history_m
@@ -300,6 +332,7 @@ class DatasetFromTxt(torch.utils.data.Dataset):
                 agent_hist_localM, neigh_localM = self.calc_speed_accel(agent_hist_localM, neigh_localM,
                                                                         agent_hist_avail, hist_avail)
                 res = {"img": np.copy(crop_img),
+                       "segm": np.copy(mask_pil_crop),
                        "agent_hist": agent_hist_localM,
                        "agent_hist_avail": agent_hist_avail,
                        "target": target_localM,
@@ -322,6 +355,7 @@ class DatasetFromTxt(torch.utils.data.Dataset):
                                                                         hist_avail)  # TODO: check time_sorted_hist
 
                 res = {"img": img,
+                       "segm": mask,
                        "agent_hist": agent_history[:, self.loader.coors_row],
                        "agent_hist_avail": agent_hist_avail,
                        "target": agent_future[:, self.loader.coors_row],
@@ -335,8 +369,8 @@ class DatasetFromTxt(torch.utils.data.Dataset):
                        "world_from_agent": None,  # world_from_agent,
                        "agent_from_world": None,  # agent_from_world
                        "loc_im_to_glob": None,
-                       "forces": forces}
-
+                       "forces": forces
+                       }
                 return res
 
         if ("stanford" in file) or ("SDD" in file):
@@ -518,6 +552,10 @@ class UnifiedInterface:
         else:
             self.image = np.stack([np.array(data[i]["img"]) for i in range(len(data))], axis=0)
 
+        try:
+            self.segm = np.stack([np.array(data[i]["segm"]) for i in range(len(data))], axis=0)
+        except KeyError:
+            self.segm = None
         self.history_positions = np.stack([np.array(data[i]["agent_hist"]) for i in range(len(data))],
                                           axis=0)
         self.history_av = np.stack([np.array(data[i]["agent_hist_avail"]) for i in range(len(data))],
@@ -526,7 +564,7 @@ class UnifiedInterface:
         try:
             self.forces = np.stack([np.array(data[i]["forces"]) for i in range(len(data))],
                                    axis=0)
-        except:
+        except KeyError:
             self.forces = None
         self.history_agents = NeighboursHistory([(data[i]["neighb"]) for i in range(len(data))]).get_history()
         self.history_agents_avail = [np.array(data[i]["neighb_avail"]) for i in range(len(data))]
@@ -737,8 +775,9 @@ if __name__ == "__main__":
     # ind = int(1000 * torch.rand(1).item())
     # data = dataset[ind]
 
-    cfg["raster_params"]["use_map"] = False
-    cfg["raster_params"]["normalize"] = False
+    cfg["raster_params"]["use_map"] = True
+    cfg["raster_params"]["normalize"] = True
+    cfg["raster_params"]["use_segm"] = True
     files = [  # "biwi_eth/biwi_eth.txt",
         "UCY/zara01/zara01.txt",
         # "crowds/students001.txt",        "crowds/students003.txt",
@@ -751,12 +790,14 @@ if __name__ == "__main__":
     # fig, axs = plt.subplots(2, 2, tight_layout=True)
 
     dataset = DatasetFromTxt(path_, files, cfg)
-    dataloader = DataLoader(dataset, batch_size=128,
-                            shuffle=False, num_workers=8, collate_fn=collate_wrapper)
+    dataloader = DataLoader(dataset, batch_size=32,
+                            shuffle=False, num_workers=0, collate_fn=collate_wrapper)
 
     threshold = 400
     speeds_zara = np.zeros(0)
     for i, data in enumerate((dataloader)):
+        print(len(np.unique(data.segm)))
+
         speed = np.linalg.norm(data.history_positions[:, :, 2:4], axis=2)[data.history_av == 1].reshape(-1)
         speeds_zara = np.concatenate((speeds_zara, speed[speed>1e-6]))
         if i > threshold:

@@ -56,6 +56,7 @@ class TrajnetLoader:
                 self.data[file] = np.genfromtxt(path + "/" + file, delimiter='')
             self.data_len += len(self.data[file])
             self.sub_data_len.append(self.data_len)
+            self.loaded_imgs = {}
 
     def get_all_agents_with_timestamp(self, dataset_ind: int, timestamp: float) -> np.array:
 
@@ -161,7 +162,7 @@ class TrajnetLoader:
          :param timestamp:  timestamp from txt file. Target future is [timespemp, timespemp + pred_len]
          :return:
         """
-        # 1. find file and image
+        # 1. find file and imreadimage
         # 2. rotate to allign with agent motion
         # 3. crop with specified in cfg area (aka 5x5meters?)
         # a. pixels to meters transformation?
@@ -170,9 +171,23 @@ class TrajnetLoader:
             txt_file = self.data_files[dataset_ind]
             if ("eth" not in txt_file) and ("UCY" not in txt_file):
                 img_file = self.path + txt_file[0:txt_file.index(".")] + ".jpg"
+                if self.cfg["raster_params"]["use_segm"]:
+                    segm_file = self.path + txt_file[0:txt_file.index(".")] + "_s.npy"
             else:
                 img_file = self.path + txt_file[0:txt_file.index(".")] + ".png"
-            img = cv2.imread(img_file).astype(np.int16)
+                if self.cfg["raster_params"]["use_segm"]:
+                    segm_file = self.path + txt_file[0:txt_file.index(".")] + "_s.npy"
+
+            if img_file not in self.loaded_imgs.keys():
+                img = cv2.imread(img_file).astype(np.int16)
+                self.loaded_imgs[img_file] = img
+            segm = None
+            if self.cfg["raster_params"]["use_segm"]:
+                if segm_file not in self.loaded_imgs.keys():
+                    segm = np.load(segm_file)
+                    self.loaded_imgs[segm_file] = segm
+                # segm[segm==0] = 1
+
             # img = Image.open(img_file)
             # img = np.asarray(img, dtype="int32")
-        return img
+        return np.copy(self.loaded_imgs[img_file]), np.copy(self.loaded_imgs[segm_file])

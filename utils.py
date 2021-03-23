@@ -85,8 +85,11 @@ def trajectory_orientation(last_pose, prev_pose):
     return angle
 
 
-def rotate_image(img: PIL.Image, angle, center: Union[np.array, list, tuple]):
+def rotate_image(img: PIL.Image, angle, center: Union[np.array, list, tuple], mask:PIL.Image=None):
     new_img = img.rotate(angle, center=(center[0], center[1]))
+    new_mask = None
+    if mask is not None:
+        new_mask = mask.rotate(angle, center=(center[0], center[1]))
     img_to_agentpix = np.array([[1, 0, -center[0]],
                                 [0, 1, -center[1]],
                                 [0, 0, 1]])
@@ -99,10 +102,10 @@ def rotate_image(img: PIL.Image, angle, center: Union[np.array, list, tuple]):
     agent_pix_to_img = np.array([[1, 0, center[0]],
                                  [0, 1, center[1]],
                                  [0, 0, 1]])
-    return new_img, agent_pix_to_img @ map_to_local @ img_to_agentpix
+    return new_img, agent_pix_to_img @ map_to_local @ img_to_agentpix, new_mask
 
 
-def crop_image_crowds(img, cfg, agent_center_img: np.array, transform, rot_mat, file):
+def crop_image_crowds(img, cfg, agent_center_img: np.array, transform, rot_mat, file, mask=None):
     # transform -> from rot image to world
     size = img.size
 
@@ -130,10 +133,14 @@ def crop_image_crowds(img, cfg, agent_center_img: np.array, transform, rot_mat, 
 
 
     cropped = img.crop((min(tl[0], br[0]), min(tl[1], br[1]), max(tl[0], br[0]), max(tl[1], br[1])))
+    mask_cropped = None
+    if mask is not None:
+        mask_cropped = mask.crop((min(tl[0], br[0]), min(tl[1], br[1]), max(tl[0], br[0]), max(tl[1], br[1])))
+        mask_cropped = mask_cropped.resize(cfg["image_shape"], 0)
     image_resize_coef = [cfg["image_shape"][0] / cropped.size[0], cfg["image_shape"][1] / cropped.size[1]]
     cropped = cropped.resize(cfg["image_shape"])
     # cropped.show()
-    return cropped, image_resize_coef
+    return cropped, image_resize_coef, mask_cropped
 
 
 def crop_image(img, cfg, agent_center: np.array, pix_to_met):

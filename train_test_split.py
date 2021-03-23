@@ -84,37 +84,37 @@ if __name__ == "__main__":
 
     cfg["raster_params"]["use_map"] = True
     cfg["raster_params"]["normalize"] = True
+    cfg["raster_params"]["use_segm"] = True
     path_ = "data/train/"
     train_ds, val_ds = get_train_val_dataloaders(path_, cfg, "eth_hotel", False)
     train_dataloader = DataLoader(train_ds, batch_size=16,
                                   shuffle=True, num_workers=0, collate_fn=collate_wrapper)
     val_dataloader = DataLoader(val_ds, batch_size=4,
                                 shuffle=False, num_workers=0, collate_fn=collate_wrapper)
-    for data in train_dataloader:
-        img = np.concatenate([data.image[i] for i in range(len(data.image))], axis=0)
-        plt.imshow(img)
-        plt.show()
-        break
 
-    for data in val_dataloader:
-        img = np.concatenate([data.image[i] for i in range(len(data.image))], axis=0)
-        plt.imshow(img)
-        plt.show()
-        break
-
-    train_ds, val_ds = get_train_val_dataloaders(path_, cfg, "SDD", False)
-    train_dataloader = DataLoader(train_ds, batch_size=16,
-                                  shuffle=True, num_workers=0, collate_fn=collate_wrapper)
-    val_dataloader = DataLoader(val_ds, batch_size=4,
-                                shuffle=False, num_workers=0, collate_fn=collate_wrapper)
-    for data in train_dataloader:
-        img = np.concatenate([data.image[i] for i in range(len(data.image))], axis=0)
-        plt.imshow(img)
-        plt.show()
-        break
-
-    for data in val_dataloader:
-        img = np.concatenate([data.image[i] for i in range(len(data.image))], axis=0)
-        plt.imshow(img)
-        plt.show()
-        break
+    for counter, data in enumerate(train_dataloader):
+        if counter > 32:
+            break
+    #
+    # for data in val_dataloader:
+    #     img = np.concatenate([data.image[i] for i in range(len(data.image))], axis=0)
+    #     plt.imshow(img)
+    #     plt.show()
+    #     break
+    #
+    # train_ds, val_ds = get_train_val_dataloaders(path_, cfg, "SDD", False)
+    # train_dataloader = DataLoader(train_ds, batch_size=16,
+    #                               shuffle=True, num_workers=0, collate_fn=collate_wrapper)
+    # val_dataloader = DataLoader(val_ds, batch_size=4,
+    #                             shuffle=False, num_workers=0, collate_fn=collate_wrapper)
+    # for data in train_dataloader:
+    #     img = np.concatenate([data.image[i] for i in range(len(data.image))], axis=0)
+    #     plt.imshow(img)
+    #     plt.show()
+    #     break
+    #
+    # for data in val_dataloader:
+    #     img = np.concatenate([data.image[i] for i in range(len(data.image))], axis=0)
+    #     plt.imshow(img)
+    #     plt.show()
+    #     break
