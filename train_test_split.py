@@ -1,4 +1,4 @@
-from dataloader import DatasetFromTxt
+from .dataloader import DatasetFromTxt
 import torch
 
 import torch
@@ -19,7 +19,7 @@ def train_val_dataset(dataset, val_split=0.25):
 def get_train_val_dataloaders(path_, cfg, validate_with, *args):
     train_files = []
     val_files = []
-    if "SDD" not in validate_with:
+    if ("SDD" not in validate_with):
         if validate_with == "eth_hotel":
             train_files = ["biwi_eth/biwi_eth.txt", "UCY/students01/students01.txt", "UCY/students03/students03.txt",
                            "UCY/zara01/zara01.txt", "UCY/zara02/zara02.txt"]

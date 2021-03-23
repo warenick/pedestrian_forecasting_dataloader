@@ -333,17 +333,19 @@ eth_hotel_cfg = {"scale": np.array([[1.1048200e-02,   6.6958900e-04,  -3.3295300
 cropping_cfg = {
     "agent_center": [0.25, 0.5],
     "image_area_meters": [15, 15],
-    "image_shape": [480, 480],
+    "image_shape": [224, 224],
 }
 
 cfg = {
     "data_path": "../data/train/",
     "files": ["biwi/biwi_hotel.txt", "mot/PETS09-S2L1.txt"],
+    "val_with_full_hist": True,
+    "train_with_full_hist": False,
     'raster_params': {
         "draw_hist": True,
         "use_map": True,
-        "use_segm": True,
         "normalize": True,
+        "use_segm": True,
         # 'raster_size': [224, 224],
         # 'pixel_size': [0.5, 0.5],
         # 'ego_center': [0.25, 0.5],

@@ -5,7 +5,6 @@ from config import cfg
 from dataloader import DatasetFromTxt
 from utils import transform_points
 from tqdm import tqdm
-
 import torch
 
 draw_n = 1
