@@ -143,7 +143,7 @@ def crop_image_crowds(img, cfg, agent_center_img: np.array, transform, rot_mat, 
     return cropped, image_resize_coef, mask_cropped
 
 
-def crop_image(img, cfg, agent_center: np.array, pix_to_met):
+def crop_image(img, cfg, agent_center: np.array, pix_to_met, mask_pil):
     size = img.size
     # np_img = np.asarray(img)
 
@@ -158,12 +158,14 @@ def crop_image(img, cfg, agent_center: np.array, pix_to_met):
 
     br_y = min(size[0], max(0, agent_center[0] +
                             (1 - cfg["agent_center"][0]) * cfg["image_area_meters"][1] / pix_to_met))
-    cropped = img.crop((tl_y, tl_x, br_y, br_x))  # np_img[int(tl_x): int(br_x), int(tl_y): int(br_y)]
+    cropped = img.crop((tl_y, tl_x, br_y, br_x))
+
+    mask_pil_cropped = mask_pil.crop((tl_y, tl_x, br_y, br_x))
     image_resize_coef = [cfg["image_shape"][0] / cropped.size[0], cfg["image_shape"][1] / cropped.size[1]]# cropped = img.crop((tl_y, tl_x, br_y, br_x))  #np_img[int(tl_x): int(br_x), int(tl_y): int(br_y)]
-    # image_resize_coef = [cfg["image_shape"][0] / cropped.size[0], cfg["image_shape"][1] / cropped.size[1]]
 
     cropped = cropped.resize(cfg["image_shape"])
-    return cropped, image_resize_coef
+    mask_pil_cropped = mask_pil_cropped.resize(cfg["image_shape"], 0)
+    return cropped, image_resize_coef, mask_pil_cropped
 
 
 def calc_transform_matrix(init_coord, angle, scale, output_shape: List):
@@ -193,8 +195,9 @@ def calc_transform_matrix(init_coord, angle, scale, output_shape: List):
 
 
 def sdd_crop_and_rotate(img: np.array, path, border_width=400, draw_traj=1, pix_to_m_cfg=SDD_scales,
-                         cropping_cfg=cropping_cfg, file=None):
+                         cropping_cfg=cropping_cfg, file=None, mask=None):
     img_pil = Image.fromarray(np.asarray(img, dtype="uint8"))
+    mask_pil = Image.fromarray(np.asarray(mask, dtype="uint8"))
     draw = ImageDraw.Draw(img_pil)
     border = border_width
 
@@ -205,19 +208,19 @@ def sdd_crop_and_rotate(img: np.array, path, border_width=400, draw_traj=1, pix_
             if np.linalg.norm(pose - np.array([-1., -1.])) > 1e-6:
                 draw.ellipse((pose[0] - R, pose[1] - R, pose[0] + R, pose[1] + R), fill='blue', outline='blue')
     img_pil = ImageOps.expand(img_pil, (border_width, border_width))
+    mask_pil = ImageOps.expand(mask_pil, (border_width, border_width))
 
     angle_deg = trajectory_orientation(path[0], path[1])
     if np.linalg.norm(path[1] - np.array([-1., -1.])) < 1e-6:
         angle_deg = 0
     angle_rad = angle_deg / 180 * math.pi
-    img_pil, map_to_local = rotate_image(img_pil, angle_deg, center=path[0] + border)
-    crop_img, scale = crop_image(img_pil, cropping_cfg, agent_center=path[0] + border, pix_to_met=scale)
+    img_pil, map_to_local, mask_pil = rotate_image(img_pil, angle_deg, center=path[0] + border, mask=mask_pil)
+    crop_img, scale, crop_mask = crop_image(img_pil, cropping_cfg, agent_center=path[0] + border,
+                                            pix_to_met=scale, mask_pil=mask_pil)
 
-    #     SDD_pix_to_m = SDD_scales["bookstore1"]["scale"]
-    #     print (scale)
     transf = calc_transform_matrix(path[0], angle_rad, scale, cropping_cfg["image_shape"])
     #     (init_coord, angle, scale, border_w=0):
-    return np.asarray(crop_img), transf, scale
+    return np.asarray(crop_img), transf, scale, np.asarray(crop_mask)
 
 
 def vis_pdf(image, distrib, transform_from_pix_to_m):

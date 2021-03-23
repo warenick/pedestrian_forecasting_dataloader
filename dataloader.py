@@ -376,7 +376,7 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         if ("stanford" in file) or ("SDD" in file):
             if self.cfg["raster_params"]["normalize"]:
                 res = self.crop_and_normilize(agent_future, agent_hist_avail, agent_history, file, hist_avail, img,
-                                              target_avil, time_sorted_hist, forces)
+                                              target_avil, time_sorted_hist, forces, mask)
 
             else:
 
@@ -446,7 +446,7 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         return agent_history, neigh_localM
 
     def crop_and_normilize(self, agent_future, agent_hist_avail, agent_history, file, hist_avail, img, target_avil,
-                           time_sorted_hist, forces):
+                           time_sorted_hist, forces, mask):
 
         # rotate in a such way that last hisory points are horizontal (elft to right),
         # crop to spec in cfg area and resize
@@ -459,11 +459,12 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         if img is None:
             pass
         else:
-            img, globPix_to_locraster, scale = sdd_crop_and_rotate(img, agent_history[:, 2:],
+            img, globPix_to_locraster, scale, mask = sdd_crop_and_rotate(img, agent_history[:, 2:],
                                                                    border_width=600,
                                                                    draw_traj=1,
                                                                    pix_to_m_cfg=self.cfg['SDD_scales'],
-                                                                   cropping_cfg=self.cfg['cropping_cfg'], file=file)
+                                                                   cropping_cfg=self.cfg['cropping_cfg'], file=file,
+                                                                   mask=mask)
 
         pix_to_m = np.eye(3) * self.cfg['SDD_scales'][file]["scale"]
         pix_to_m[:2, :2] = pix_to_m[:2, :2] @ np.array(
@@ -510,6 +511,7 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         agent_hist_localM, neigh_localM = self.calc_speed_accel(agent_hist_localM, neigh_localM, agent_hist_avail,
                                                                 hist_avail)
         res = {"img": np.copy(img),
+               "segm": np.copy(mask),
                "agent_hist": agent_hist_localM,
                "agent_hist_avail": agent_hist_avail,
                "target": target_localM,
@@ -594,7 +596,7 @@ def collate_wrapper(batch):
 
 if __name__ == "__main__":
     pass
-    path_ = "data/train/"
+    path_ = "/media/robot/hdd1/hdd_repos/pedestrian_forecasting_dataloader/data/train/"
     # cfg["raster_params"]["use_map"] = True
     # cfg["raster_params"]["normalize"] = False
     # # files = ["eth_hotel/eth_hotel.txt",
@@ -779,7 +781,7 @@ if __name__ == "__main__":
     cfg["raster_params"]["normalize"] = True
     cfg["raster_params"]["use_segm"] = True
     files = [  # "biwi_eth/biwi_eth.txt",
-        "UCY/zara01/zara01.txt",
+        "SDD/bookstore_0.txt",
         # "crowds/students001.txt",        "crowds/students003.txt",
         # "stanford/bookstore_0.txt", "stanford/bookstore_1.txt",
         # "stanford/bookstore_2.txt", "stanford/bookstore_3.txt",
@@ -796,8 +798,6 @@ if __name__ == "__main__":
     threshold = 400
     speeds_zara = np.zeros(0)
     for i, data in enumerate((dataloader)):
-        print(len(np.unique(data.segm)))
-
         speed = np.linalg.norm(data.history_positions[:, :, 2:4], axis=2)[data.history_av == 1].reshape(-1)
         speeds_zara = np.concatenate((speeds_zara, speed[speed>1e-6]))
         if i > threshold:
