@@ -62,7 +62,7 @@ def get_train_val_dataloaders(path_, cfg, validate_with, *args):
                  "SDD/nexus_0.txt", "SDD/nexus_1.txt", "SDD/nexus_2.txt", "SDD/nexus_3.txt", "SDD/nexus_4.txt",
                  "SDD/nexus_5.txt", "SDD/nexus_6.txt", "SDD/nexus_7.txt", "SDD/nexus_8.txt", "SDD/nexus_9.txt",
                  "SDD/nexus_10.txt", "SDD/nexus_11.txt",
-                 "SDD/quad_0.txt", "SDD/quad_1.txt", "SDD/quad_2.txt", "SDD/quad_3.txt",
+#                  "SDD/quad_0.txt", "SDD/quad_1.txt", "SDD/quad_2.txt", "SDD/quad_3.txt",
                  ]
 
         # val_files = ["UCY/students01/students01.txt", "UCY/students01/students03.txt"]
