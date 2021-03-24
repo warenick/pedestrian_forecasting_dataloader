@@ -105,7 +105,7 @@ class DatasetFromTxt(torch.utils.data.Dataset):
                 time_sorted_hist[:, :, self.loader.coors_row] = transform_points(
                     time_sorted_hist[:, :, self.loader.coors_row],
                     np.linalg.inv(pix_to_m["scale"]))
-
+            agent_ts_id = agent_history[:, :2]
             agent_history = transform_points(agent_history[:, 2:], pix_to_m["scale"])
             agent_future = transform_points(agent_future[:, 2:], pix_to_m["scale"])
             if self.cfg["raster_params"]["normalize"]:
@@ -135,7 +135,8 @@ class DatasetFromTxt(torch.utils.data.Dataset):
                     "agent_from_world": np.eye(3),  # agent_from_world
                     "forces": np.eye(3),
                     "loc_im_to_glob": np.eye(3),
-                    "file": file[file.index("/") + 1:]
+                    "file": file[file.index("/") + 1:],
+                    "agent_ts_id": agent_ts_id
                     }
 
             # if not self.cfg["raster_params"]["normalize"]:
@@ -548,6 +549,11 @@ class UnifiedInterface:
         self.extent = None
         self.yaw = None
         self.speed = None
+        try:
+            self.agent_ts_id = np.stack([np.array(data[i]["agent_ts_id"]) for i in range(len(data))],
+                                       axis=0)
+        except KeyError:
+            self.agent_ts_id = None
 
 
 def collate_wrapper(batch):
@@ -556,190 +562,11 @@ def collate_wrapper(batch):
 
 if __name__ == "__main__":
     pass
-    path_ = "data/train/"
-    # cfg["raster_params"]["use_map"] = True
-    # cfg["raster_params"]["normalize"] = False
-    # # files = ["eth_hotel/eth_hotel.txt",
-    # #         #"biwi_eth/biwi_eth.txt",
-    # #          # "crowds/crowds_zara02.txt", "crowds/crowds_zara03.txt", "crowds/students001.txt",
-    # #          # "crowds/students003.txt",
-    # #          # "stanford/bookstore_0.txt", "stanford/bookstore_1.txt",
-    # #          # "stanford/bookstore_2.txt", "stanford/bookstore_3.txt",
-    # #          # "stanford/coupa_3.txt",
-    # #          # "stanford/deathCircle_0.txt",
-    # #          ]
-    # # #
-    # # dataset = DatasetFromTxt(path_, files, cfg)
-    # # img = dataset[0]["img"]
-    # # # TODO: plot all trajes
-    # # img_pil = Image.fromarray(np.asarray(img, dtype="uint8"))
-    # # img_pil = img_pil.resize([int(720*2), int(576*2)])
-    # # img_pil = img_pil.rotate(90, center=(img_pil.size[0]/2, img_pil.size[1]/2))
-    # # bord = 600
-    # # img_pil = ImageOps.expand(img_pil, (bord, bord))
-    # # draw = ImageDraw.Draw(img_pil)
-    # # R = 2
-    # # pix_to_image = dataset.cfg["eth_hotel_pix_to_image_cfg"]
-    # # pix_to_m = dataset.cfg['eth_hotel_h']
-    # # for i in range(0, len(dataset), 2):
-    # #     # ind = int(1000 * torch.rand(1).item())
-    # #     data = dataset[i]
-    # #     agent_history = data["agent_hist"][:, :2]
-    # #     agent_history = transform_points(agent_history, np.linalg.inv(pix_to_m["scale"]))
-    # #     # agent_history = np.flip(agent_history, axis=1)
-    # #     for number, pose in enumerate(agent_history):
-    # #         if data["agent_hist_avail"][number]:
-    # #             draw.ellipse((pix_to_image["coef_x"] * pose[0] - R + pix_to_image["displ_x"] + bord,
-    # #                           pix_to_image["coef_y"] * pose[1] - R + pix_to_image["displ_y"] + bord,
-    # #                           pix_to_image["coef_x"] * pose[0] + R + pix_to_image["displ_x"] + bord,
-    # #                           pix_to_image["coef_y"] * pose[1] + R + pix_to_image["displ_y"] + bord
-    # #                           ), fill='blue', outline='blue')
-    # #
-    # # img_pil.show()
-    #
-    #
-    # files = [  # "biwi_eth/biwi_eth.txt",
-    #     "crowds/crowds_zara02.txt", "crowds/crowds_zara03.txt", "crowds/students001.txt",
-    #     # "crowds/students003.txt",
-    #     # "stanford/bookstore_0.txt", "stanford/bookstore_1.txt",
-    #     # "stanford/bookstore_2.txt", "stanford/bookstore_3.txt",
-    #     # "stanford/coupa_3.txt",
-    #     # "stanford/deathCircle_0.txt",
-    # ]
-    # dataset = DatasetFromTxt(path_, files, cfg)
-    # for _ in range(100):
-    #     ind = int(1000 * torch.rand(1).item())
-    #     data = dataset[ind]
-    #
-    # files = [  # "biwi_eth/biwi_eth.txt",
-    #     # "crowds/crowds_zara02.txt", "crowds/crowds_zara03.txt", "crowds/students001.txt",
-    #     # "crowds/students003.txt",
-    #     "stanford/bookstore_0.txt", "stanford/bookstore_1.txt",
-    #     # "stanford/bookstore_2.txt", "stanford/bookstore_3.txt",
-    #     # "stanford/coupa_3.txt",
-    #     # "stanford/deathCircle_0.txt",
-    # ]
-    # dataset = DatasetFromTxt(path_, files, cfg)
-    # ind = int(1000 * torch.rand(1).item())
-    # data = dataset[ind]
-    #
-    # cfg["raster_params"]["use_map"] = True
-    # cfg["raster_params"]["normalize"] = False
-    # files = ["biwi_eth/biwi_eth.txt",
-    #          # "crowds/crowds_zara02.txt", "crowds/crowds_zara03.txt", "crowds/students001.txt",
-    #          # "crowds/students003.txt",
-    #          # "stanford/bookstore_0.txt", "stanford/bookstore_1.txt",
-    #          # "stanford/bookstore_2.txt", "stanford/bookstore_3.txt",
-    #          # "stanford/coupa_3.txt",
-    #          # "stanford/deathCircle_0.txt",
-    #          ]
-    # # dataset = DatasetFromTxt(path_, files, cfg)
-    # # ind = int(1000 * torch.rand(1).item())
-    # # data = dataset[ind]
-    #
-    # files = [  # "biwi_eth/biwi_eth.txt",
-    #     "crowds/crowds_zara02.txt", "crowds/crowds_zara03.txt", "crowds/students001.txt",
-    #     # "crowds/students003.txt",
-    #     # "stanford/bookstore_0.txt", "stanford/bookstore_1.txt",
-    #     # "stanford/bookstore_2.txt", "stanford/bookstore_3.txt",
-    #     # "stanford/coupa_3.txt",
-    #     # "stanford/deathCircle_0.txt",
-    # ]
-    # dataset = DatasetFromTxt(path_, files, cfg)
-    # ind = int(1000 * torch.rand(1).item())
-    # data = dataset[ind]
-    #
-    # files = [  # "biwi_eth/biwi_eth.txt",
-    #     # "crowds/crowds_zara02.txt", "crowds/crowds_zara03.txt", "crowds/students001.txt",
-    #     # "crowds/students003.txt",
-    #     "stanford/bookstore_0.txt", "stanford/bookstore_1.txt",
-    #     # "stanford/bookstore_2.txt", "stanford/bookstore_3.txt",
-    #     # "stanford/coupa_3.txt",
-    #     # "stanford/deathCircle_0.txt",
-    # ]
-    # dataset = DatasetFromTxt(path_, files, cfg)
-    # ind = int(1000 * torch.rand(1).item())
-    # data = dataset[ind]
-    #
-    # cfg["raster_params"]["use_map"] = False
-    # cfg["raster_params"]["normalize"] = True
-    # files = ["biwi_eth/biwi_eth.txt",
-    #          # "crowds/crowds_zara02.txt", "crowds/crowds_zara03.txt", "crowds/students001.txt",
-    #          # "crowds/students003.txt",
-    #          # "stanford/bookstore_0.txt", "stanford/bookstore_1.txt",
-    #          # "stanford/bookstore_2.txt", "stanford/bookstore_3.txt",
-    #          # "stanford/coupa_3.txt",
-    #          # "stanford/deathCircle_0.txt",
-    #          ]
-    # dataset = DatasetFromTxt(path_, files, cfg)
-    # ind = int(1000 * torch.rand(1).item())
-    # data = dataset[ind]
-    #
-    # files = [  # "biwi_eth/biwi_eth.txt",
-    #     "crowds/crowds_zara02.txt", "crowds/crowds_zara03.txt", "crowds/students001.txt",
-    #     # "crowds/students003.txt",
-    #     # "stanford/bookstore_0.txt", "stanford/bookstore_1.txt",
-    #     # "stanford/bookstore_2.txt", "stanford/bookstore_3.txt",
-    #     # "stanford/coupa_3.txt",
-    #     # "stanford/deathCircle_0.txt",
-    # ]
-    # dataset = DatasetFromTxt(path_, files, cfg)
-    # ind = int(1000 * torch.rand(1).item())
-    # data = dataset[ind]
-    #
-    # files = [  # "biwi_eth/biwi_eth.txt",
-    #     # "crowds/crowds_zara02.txt", "crowds/crowds_zara03.txt", "crowds/students001.txt",
-    #     # "crowds/students003.txt",
-    #     "stanford/bookstore_0.txt", "stanford/bookstore_1.txt",
-    #     # "stanford/bookstore_2.txt", "stanford/bookstore_3.txt",
-    #     # "stanford/coupa_3.txt",
-    #     # "stanford/deathCircle_0.txt",
-    # ]
-    # dataset = DatasetFromTxt(path_, files, cfg)
-    # ind = int(1000 * torch.rand(1).item())
-    # data = dataset[ind]
-    #
-    # cfg["raster_params"]["use_map"] = False
-    # cfg["raster_params"]["normalize"] = False
-    # files = ["biwi_eth/biwi_eth.txt",
-    #          # "crowds/crowds_zara02.txt", "crowds/crowds_zara03.txt", "crowds/students001.txt",
-    #          # "crowds/students003.txt",
-    #          # "stanford/bookstore_0.txt", "stanford/bookstore_1.txt",
-    #          # "stanford/bookstore_2.txt", "stanford/bookstore_3.txt",
-    #          # "stanford/coupa_3.txt",
-    #          # "stanford/deathCircle_0.txt",
-    #          ]
-    # dataset = DatasetFromTxt(path_, files, cfg)
-    # ind = int(1000 * torch.rand(1).item())
-    # data = dataset[ind]
-    #
-    # files = [  # "biwi_eth/biwi_eth.txt",
-    #     "crowds/crowds_zara02.txt", "crowds/crowds_zara03.txt", "crowds/students001.txt",
-    #     # "crowds/students003.txt",
-    #     # "stanford/bookstore_0.txt", "stanford/bookstore_1.txt",
-    #     # "stanford/bookstore_2.txt", "stanford/bookstore_3.txt",
-    #     # "stanford/coupa_3.txt",
-    #     # "stanford/deathCircle_0.txt",
-    # ]
-    # dataset = DatasetFromTxt(path_, files, cfg)
-    # ind = int(1000 * torch.rand(1).item())
-    # data = dataset[ind]
-    #
-    # files = [  # "biwi_eth/biwi_eth.txt",
-    #     # "crowds/crowds_zara02.txt", "crowds/crowds_zara03.txt", "crowds/students001.txt",
-    #     # "crowds/students003.txt",
-    #     "stanford/bookstore_0.txt", "stanford/bookstore_1.txt",
-    #     # "stanford/bookstore_2.txt", "stanford/bookstore_3.txt",
-    #     # "stanford/coupa_3.txt",
-    #     # "stanford/deathCircle_0.txt",
-    # ]
-    # dataset = DatasetFromTxt(path_, files, cfg)
-    # ind = int(1000 * torch.rand(1).item())
-    # data = dataset[ind]
+    path_ = "/media/robot/hdd1/hdd_repos/pedestrian_forecasting_dataloader/data/train/"
 
     cfg["raster_params"]["use_map"] = False
-    cfg["raster_params"]["normalize"] = False
-    files = [  # "biwi_eth/biwi_eth.txt",
+    cfg["raster_params"]["normalize"] = True
+    files = [
         "UCY/zara01/zara01.txt",
         # "crowds/students001.txt",        "crowds/students003.txt",
         # "stanford/bookstore_0.txt", "stanford/bookstore_1.txt",
