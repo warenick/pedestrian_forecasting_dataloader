@@ -42,9 +42,9 @@ class TrajnetLoader:
                 try:
                     name = path + "/" + file
                     new_name = name[:name.index(".")] + ".npy"
-                    self.data[file] = np.load(new_name)
+                    self.data[file] = np.load(new_name).astype(np.float32)
                 except:
-                    self.data[file] = np.loadtxt(path + "/" + file, delimiter=' ', usecols=[0, 1, 2, 3, 4, 5])
+                    self.data[file] = np.loadtxt(path + "/" + file, delimiter=' ', usecols=[0, 1, 2, 3, 4, 5]).astype(np.float32)
 
                 self.data[file] = self.data[file][
                     (self.data[file][:, 5] + (self.data[file][:, 5].min() % 12)) % 12 == 0]
@@ -53,7 +53,7 @@ class TrajnetLoader:
                 self.data[file][:, 3] = (self.data[file][:, 3] + self.data[file][:, 5]) / 2
                 self.data[file] = self.data[file][:, :4]
             else:
-                self.data[file] = np.genfromtxt(path + "/" + file, delimiter='')
+                self.data[file] = np.genfromtxt(path + "/" + file, delimiter='').astype(np.float32)
             self.data_len += len(self.data[file])
             self.sub_data_len.append(self.data_len)
             self.loaded_imgs = {}
@@ -78,18 +78,31 @@ class TrajnetLoader:
          :param timestamp:  timestamp from txt file. Observed history is [timespemp - history_len, timespemp]
          :return: observed trajectory of specified agent np.array shape(self.history_len+1,4).
         """
-
+        # import time
+        # st = time.time()
         file = self.data_files[dataset_ind]
+
         data = self.data[file]
 
         start_ts = timestamp - (
                 self.history_len / self.delta_t[file[0:file.index("/")]])  # *self.delta_t[file[0:file.index("/")]])
         #         if self.cfg["raster_params"]["use_map"] == True:
+        # print(st - time.time())
+        # st = time.time()
+        ind_start = np.searchsorted(data[:, self.index_row], ped_id)
+        ind_stop = np.searchsorted(data[:, self.index_row], ped_id + 1)
+        data = data[ind_start:ind_stop, :]  # filter by index
 
-        data = data[data[:, self.index_row] == ped_id]  # filter by index
+
+        # data = data[data[:, self.index_row] == ped_id]  # filter by index
         data = data[(data[:, self.ts_row] > start_ts)]  # filter by timestamp
         data = data[data[:, self.ts_row] <= timestamp]
-        # out = np.zeros((self.history_len + 1, 4)) - 1
+        # data = np.argwhere(data[:, self.ts_row] > start_ts)
+        # data = np.argwhere(data[:, self.index_row] == ped_id)
+        # data = np.argwhere(data[:, self.ts_row] <= timestamp)
+
+        # print(st - time.time())
+        # st = time.time()
         if "eth" in file:
             data = data[:, (0, 1, 2, 4)]
         if ("zara01" in file) or ("zara02" in file):
@@ -101,6 +114,8 @@ class TrajnetLoader:
         timecoef = self.delta_timestamp[file[0:file.index("/")]] * self.delta_t[file[0:file.index("/")]]
         out = np.zeros((int(self.history_len / timecoef), 4)) - 1
         out[0:len(data), :] = np.flip(data, axis=0)
+        # print(st - time.time())
+
         return out
 
     def get_agent_future(self, dataset_ind: int, ped_id: int, timestamp: float) -> np.array:
@@ -191,3 +206,4 @@ class TrajnetLoader:
             # img = Image.open(img_file)
             # img = np.asarray(img, dtype="int32")
         return np.copy(self.loaded_imgs[img_file]), np.copy(self.loaded_imgs[segm_file])
+
