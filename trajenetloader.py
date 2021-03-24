@@ -130,7 +130,11 @@ class TrajnetLoader:
         end_timestamp = timestamp + (
                 self.pred_len / self.delta_t[file[0:file.index("/")]])  # self.delta_t[file[0:file.index("/")]])
         data = self.data[file]
-        data = data[data[:, self.index_row] == ped_id]  # filter by index
+
+        ind_start = np.searchsorted(data[:, self.index_row], ped_id)
+        ind_stop = np.searchsorted(data[:, self.index_row], ped_id + 1)
+        data = data[ind_start:ind_stop, :]  # filter by index
+
         data = data[(data[:, self.ts_row] <= end_timestamp)]  # filter by timestamp
         data = data[data[:, self.ts_row] > timestamp]
         if "eth" in file:
