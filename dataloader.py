@@ -75,9 +75,7 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         hist_avail = (time_sorted_hist[:, :, 0] != -1).astype(int)
         neighb_future_avail = (time_sorted_future[:, :, 0] != -1).astype(int)
         img, mask = self.loader.get_map(dataset_index, ped_id, ts)
-        if mask is not None:
-            pass
-            # img = np.concatenate((img, mask.reshape(mask.shape[0], -1, 1)), axis=2)
+
         if not self.cfg["raster_params"]["use_map"]:
             if "zara" in file:
                 pix_to_m = self.cfg["zara_h"]

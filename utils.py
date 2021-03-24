@@ -204,15 +204,17 @@ def sdd_crop_and_rotate(img: np.array, path, border_width=400, draw_traj=1, pix_
 
     scale = pix_to_m_cfg[file]["scale"]
     if draw_traj:
-        R = 5
+        R = 1
         for pose in path:
             if np.linalg.norm(pose - np.array([-1., -1.])) > 1e-6:
-                draw.ellipse((pose[0] - R, pose[1] - R, pose[0] + R, pose[1] + R), fill='blue', outline='blue')
+                draw.ellipse((pose[0]/scale_factor - R, pose[1]/scale_factor - R,
+                              pose[0]/scale_factor + R, pose[1]/scale_factor + R),
+                             fill='blue', outline='blue')
 
 
 
-    img_pil = img_pil.resize((img_pil.size[0]//scale_factor, img_pil.size[1]//scale_factor))
-    mask_pil = mask_pil.resize((mask_pil.size[0] // scale_factor, mask_pil.size[1] // scale_factor), 0)
+    # img_pil = img_pil.resize((img_pil.size[0]//scale_factor, img_pil.size[1]//scale_factor))
+    # mask_pil = mask_pil.resize((mask_pil.size[0] // scale_factor, mask_pil.size[1] // scale_factor), 0)
     img_pil = ImageOps.expand(img_pil, (border, border))
     mask_pil = ImageOps.expand(mask_pil, (border, border))
 

@@ -195,11 +195,16 @@ class TrajnetLoader:
 
             if img_file not in self.loaded_imgs.keys():
                 img = cv2.imread(img_file).astype(np.int16)
+                if "SDD" in img_file:
+                    img = cv2.resize(img, (img.shape[1]//5, img.shape[0]//5), interpolation=0)
                 self.loaded_imgs[img_file] = img
             segm = None
             if self.cfg["raster_params"]["use_segm"]:
                 if segm_file not in self.loaded_imgs.keys():
+
                     segm = np.load(segm_file)
+                    if "SDD" in img_file:
+                        segm = cv2.resize(segm, (segm.shape[1] // 5, segm.shape[0] // 5), interpolation=0)
                     self.loaded_imgs[segm_file] = segm
                 # segm[segm==0] = 1
 
