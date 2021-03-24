@@ -18,11 +18,13 @@ def visualize_test():
     cfg["raster_params"]["use_map"] = True
     cfg["raster_params"]["normalize"] = True
     files = [
-        "eth_hotel/eth_hotel.txt"
+        "SDD/bookstore_0.txt"
     ]
-    path_ = "./data/train/"
+    path_ = "/media/robot/hdd1/hdd_repos/pedestrian_forecasting_dataloader/data/train/"
     dataset = DatasetFromTxt(path_, files, cfg)
     # path_to_save = "/home/robot/repos/SDD_forces/192_192_f_n/"
+    torch.manual_seed(42)
+    np.random.seed(42)
     for i in tqdm(range(0, len(dataset))):
         ind = int(np.random.rand() * len(dataset))
         data = dataset[ind]
@@ -77,11 +79,17 @@ if __name__ == "__main__":
     from train_test_split import get_train_val_dataloaders
     from dataloader import  collate_wrapper
     import numpy as np
-    cfg["raster_params"]["use_map"] = False
+
+    visualize_test()
+    cfg["raster_params"]["use_map"] = True
     cfg["raster_params"]["normalize"] = True
+    cfg["raster_params"]["use_segm"] = True
+
     path_ = "/media/robot/hdd1/hdd_repos/pedestrian_forecasting_dataloader/data/train/"
-    val_files = ["eth_hotel", "biwi_eth", "zara01", "zara02", "students"]
-    for val_file in val_files:
+    files = [
+        "SDD"
+    ]
+    for val_file in files:
         train_ds, val_ds = get_train_val_dataloaders(path_, cfg, val_file, False)
         from torch.utils.data import DataLoader
         train_dataloader = DataLoader(train_ds, batch_size=512,

@@ -1,4 +1,7 @@
-from .dataloader import DatasetFromTxt
+try:
+    from .dataloader import DatasetFromTxt
+except ImportError:
+    from dataloader import DatasetFromTxt
 import torch
 
 import torch
@@ -62,7 +65,8 @@ def get_train_val_dataloaders(path_, cfg, validate_with, *args):
                  "SDD/nexus_0.txt", "SDD/nexus_1.txt", "SDD/nexus_2.txt", "SDD/nexus_3.txt", "SDD/nexus_4.txt",
                  "SDD/nexus_5.txt", "SDD/nexus_6.txt", "SDD/nexus_7.txt", "SDD/nexus_8.txt", "SDD/nexus_9.txt",
                  "SDD/nexus_10.txt", "SDD/nexus_11.txt",
-#                  "SDD/quad_0.txt", "SDD/quad_1.txt", "SDD/quad_2.txt", "SDD/quad_3.txt",
+
+                 # "SDD/quad_0.txt", "SDD/quad_1.txt", "SDD/quad_2.txt", "SDD/quad_3.txt",
                  ]
 
         # val_files = ["UCY/students01/students01.txt", "UCY/students01/students03.txt"]
@@ -76,6 +80,7 @@ def get_train_val_dataloaders(path_, cfg, validate_with, *args):
 
 
 if __name__ == "__main__":
+    torch.manual_seed(42)
     from config import cfg
     from dataloader import collate_wrapper
     from torch.utils.data import DataLoader
@@ -85,36 +90,13 @@ if __name__ == "__main__":
     cfg["raster_params"]["use_map"] = True
     cfg["raster_params"]["normalize"] = True
     cfg["raster_params"]["use_segm"] = True
-    path_ = "data/train/"
-    train_ds, val_ds = get_train_val_dataloaders(path_, cfg, "eth_hotel", False)
+    path_ = "/media/robot/hdd1/hdd_repos/pedestrian_forecasting_dataloader/data/train/"
+    train_ds, val_ds = get_train_val_dataloaders(path_, cfg, "SDD", False)
     train_dataloader = DataLoader(train_ds, batch_size=16,
                                   shuffle=True, num_workers=0, collate_fn=collate_wrapper)
     val_dataloader = DataLoader(val_ds, batch_size=4,
                                 shuffle=False, num_workers=0, collate_fn=collate_wrapper)
 
     for counter, data in enumerate(train_dataloader):
-        if counter > 32:
+        if counter > 64:
             break
-    #
-    # for data in val_dataloader:
-    #     img = np.concatenate([data.image[i] for i in range(len(data.image))], axis=0)
-    #     plt.imshow(img)
-    #     plt.show()
-    #     break
-    #
-    # train_ds, val_ds = get_train_val_dataloaders(path_, cfg, "SDD", False)
-    # train_dataloader = DataLoader(train_ds, batch_size=16,
-    #                               shuffle=True, num_workers=0, collate_fn=collate_wrapper)
-    # val_dataloader = DataLoader(val_ds, batch_size=4,
-    #                             shuffle=False, num_workers=0, collate_fn=collate_wrapper)
-    # for data in train_dataloader:
-    #     img = np.concatenate([data.image[i] for i in range(len(data.image))], axis=0)
-    #     plt.imshow(img)
-    #     plt.show()
-    #     break
-    #
-    # for data in val_dataloader:
-    #     img = np.concatenate([data.image[i] for i in range(len(data.image))], axis=0)
-    #     plt.imshow(img)
-    #     plt.show()
-    #     break

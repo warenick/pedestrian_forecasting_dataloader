@@ -199,7 +199,8 @@ def sdd_crop_and_rotate(img: np.array, path, border_width=400, draw_traj=1, pix_
     img_pil = Image.fromarray(np.asarray(img, dtype="uint8"))
     mask_pil = Image.fromarray(np.asarray(mask, dtype="uint8"))
     draw = ImageDraw.Draw(img_pil)
-    border = border_width
+    scale_factor = 5
+    border = border_width//scale_factor
 
     scale = pix_to_m_cfg[file]["scale"]
     if draw_traj:
@@ -207,17 +208,23 @@ def sdd_crop_and_rotate(img: np.array, path, border_width=400, draw_traj=1, pix_
         for pose in path:
             if np.linalg.norm(pose - np.array([-1., -1.])) > 1e-6:
                 draw.ellipse((pose[0] - R, pose[1] - R, pose[0] + R, pose[1] + R), fill='blue', outline='blue')
-    img_pil = ImageOps.expand(img_pil, (border_width, border_width))
-    mask_pil = ImageOps.expand(mask_pil, (border_width, border_width))
+
+
+
+    img_pil = img_pil.resize((img_pil.size[0]//scale_factor, img_pil.size[1]//scale_factor))
+    mask_pil = mask_pil.resize((mask_pil.size[0] // scale_factor, mask_pil.size[1] // scale_factor), 0)
+    img_pil = ImageOps.expand(img_pil, (border, border))
+    mask_pil = ImageOps.expand(mask_pil, (border, border))
 
     angle_deg = trajectory_orientation(path[0], path[1])
     if np.linalg.norm(path[1] - np.array([-1., -1.])) < 1e-6:
         angle_deg = 0
     angle_rad = angle_deg / 180 * math.pi
-    img_pil, map_to_local, mask_pil = rotate_image(img_pil, angle_deg, center=path[0] + border, mask=mask_pil)
-    crop_img, scale, crop_mask = crop_image(img_pil, cropping_cfg, agent_center=path[0] + border,
-                                            pix_to_met=scale, mask_pil=mask_pil)
-
+    img_pil, map_to_local, mask_pil = rotate_image(img_pil, angle_deg, center=path[0]/scale_factor + border, mask=mask_pil)
+    crop_img, scale, crop_mask = crop_image(img_pil, cropping_cfg, agent_center=path[0]/scale_factor + border,
+                                            pix_to_met=scale*scale_factor, mask_pil=mask_pil)
+    for index in range(len(scale)):
+        scale[index] = scale[index]/scale_factor
     transf = calc_transform_matrix(path[0], angle_rad, scale, cropping_cfg["image_shape"])
     #     (init_coord, angle, scale, border_w=0):
     return np.asarray(crop_img), transf, scale, np.asarray(crop_mask)
