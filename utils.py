@@ -12,7 +12,32 @@ try:
     from config import SDD_scales, cropping_cfg
 except:
     from .config import SDD_scales, cropping_cfg
-    
+import kornia
+
+
+def preprocess_data(data, device="cpu") -> torch.tensor:
+    imgs_tensor = (torch.tensor(data.image).permute(0, 3, 1, 2).float() / 255).to(device)
+    bs = imgs_tensor.shape[0]
+    cropping_points = data.cropping_points
+    bboxes = torch.zeros((bs, 4, 2)).to(device)
+    bboxes[:, 0, :] = torch.tensor([cropping_points[:, 0], cropping_points[:, 1]]).permute(1, 0)
+    bboxes[:, 1, :] = torch.tensor([cropping_points[:, 2], cropping_points[:, 1]]).permute(1, 0)
+    bboxes[:, 2, :] = torch.tensor([cropping_points[:, 2], cropping_points[:, 3]]).permute(1, 0)
+    bboxes[:, 3, :] = torch.tensor([cropping_points[:, 0], cropping_points[:, 3]]).permute(1, 0)
+    transf = torch.tensor(data.map_affine)[:, :2, :].float().to(device)
+    dst_bboxes = torch.tensor([[[0., 0], [224, 0], [224, 224], [0, 224]]]).repeat(bs, 1, 1)
+    flags = {}
+    flags['interpolation'] = torch.tensor([0]).to(device)
+    flags['align_corners'] = torch.ones(1).bool().to(device)
+
+    params = {"src": bboxes.to(device),
+              "dst": dst_bboxes.to(device)
+              }
+
+    imgs = kornia.warp_affine(imgs_tensor, transf, mode="nearest", dsize=imgs_tensor.shape[2:])
+    imgs = kornia.apply_crop(imgs, params, flags)
+    return imgs
+
 
 def transform_points2d(points: np.array, transform: np.array):
     """
@@ -61,7 +86,8 @@ def sort_neigh_history(unsorted: List[np.array]):
         time_sorted[i, :len(poses_at_ts)] = poses_at_ts
     return time_sorted
 
-def sort_neigh_future (unsorted: List[np.array]):
+
+def sort_neigh_future(unsorted: List[np.array]):
     '''
         :param unsorted - List of neighb observations.
                    neighb observations is np.array of shape X(x<=obs_len, 4)
@@ -71,7 +97,7 @@ def sort_neigh_future (unsorted: List[np.array]):
     unsorted = np.array(unsorted)
     time_sorted = np.zeros((12, len(unsorted), 4)) - 1
     unique_tss = np.array(np.unique(unsorted[:, :, 0]))
-    unique_tss = unique_tss[unique_tss != -1] #[::-1]
+    unique_tss = unique_tss[unique_tss != -1]  # [::-1]
     for i, ts in enumerate(unique_tss):
         poses_at_ts = unsorted[unsorted[:, :, 0] == ts]
         time_sorted[i, :len(poses_at_ts)] = poses_at_ts
@@ -85,11 +111,11 @@ def trajectory_orientation(last_pose, prev_pose):
     return angle
 
 
-def rotate_image(img: PIL.Image, angle, center: Union[np.array, list, tuple], mask:PIL.Image=None):
-    new_img = img.rotate(angle, center=(center[0], center[1]))
+def rotate_image(img: PIL.Image, angle, center: Union[np.array, list, tuple], mask: PIL.Image = None):
+    # new_img = img.rotate(angle, center=(center[0], center[1]))
     new_mask = None
-    if mask is not None:
-        new_mask = mask.rotate(angle, center=(center[0], center[1]))
+    # if mask is not None:
+    #     new_mask = mask.rotate(angle, center=(center[0], center[1]))
     img_to_agentpix = np.array([[1, 0, -center[0]],
                                 [0, 1, -center[1]],
                                 [0, 0, 1]])
@@ -102,7 +128,7 @@ def rotate_image(img: PIL.Image, angle, center: Union[np.array, list, tuple], ma
     agent_pix_to_img = np.array([[1, 0, center[0]],
                                  [0, 1, center[1]],
                                  [0, 0, 1]])
-    return new_img, agent_pix_to_img @ map_to_local @ img_to_agentpix, new_mask
+    return None, agent_pix_to_img @ np.linalg.inv(map_to_local) @ img_to_agentpix, None
 
 
 def crop_image_crowds(img, cfg, agent_center_img: np.array, transform, rot_mat, file, mask=None):
@@ -117,20 +143,19 @@ def crop_image_crowds(img, cfg, agent_center_img: np.array, transform, rot_mat, 
         rot_mat = np.linalg.inv(rot_mat)
     if "eth" in file:
         orientation = -1
-    tl_disp = rot_mat @ (np.array([orientation*cfg["agent_center"][0]* cfg["image_area_meters"][0],
-                         -cfg["agent_center"][1] * cfg["image_area_meters"][1],
-                         1]))
+    tl_disp = rot_mat @ (np.array([orientation * cfg["agent_center"][0] * cfg["image_area_meters"][0],
+                                   -cfg["agent_center"][1] * cfg["image_area_meters"][1],
+                                   1]))
 
     tl_m = (agent_center_m) + tl_disp
 
-    br_displ = rot_mat @ (np.array([orientation*( -1 + cfg["agent_center"][0]) * cfg["image_area_meters"][0],
-                          (1 - cfg["agent_center"][1]) * cfg["image_area_meters"][1],
-                          1]))
+    br_displ = rot_mat @ (np.array([orientation * (-1 + cfg["agent_center"][0]) * cfg["image_area_meters"][0],
+                                    (1 - cfg["agent_center"][1]) * cfg["image_area_meters"][1],
+                                    1]))
     br_m = (agent_center_m) + br_displ
 
-    tl = (np.linalg.inv(transform)  @ np.array([tl_m[0], tl_m[1], 1]))[:2]
-    br = (np.linalg.inv(transform)  @ np.array([br_m[0], br_m[1], 1]))[:2]
-
+    tl = (np.linalg.inv(transform) @ np.array([tl_m[0], tl_m[1], 1]))[:2]
+    br = (np.linalg.inv(transform) @ np.array([br_m[0], br_m[1], 1]))[:2]
 
     cropped = img.crop((min(tl[0], br[0]), min(tl[1], br[1]), max(tl[0], br[0]), max(tl[1], br[1])))
     mask_cropped = None
@@ -144,28 +169,21 @@ def crop_image_crowds(img, cfg, agent_center_img: np.array, transform, rot_mat, 
 
 
 def crop_image(img, cfg, agent_center: np.array, pix_to_met, mask_pil):
-    size = img.size
+    # size = img.size
     # np_img = np.asarray(img)
 
-    tl_x = min(size[1], max(0, agent_center[1] -
-                            cfg["agent_center"][1] * cfg["image_area_meters"][0] / pix_to_met))
-    #     print (tl_y)
-    tl_y = min(size[0], max(0, agent_center[0] -
-                            cfg["agent_center"][0] * cfg["image_area_meters"][1] / pix_to_met))
-    #     print (tl_x)
-    br_x = min(size[1], max(0, agent_center[1] +
-                            (1 - cfg["agent_center"][1]) * cfg["image_area_meters"][0] / pix_to_met))
+    tl_x = max(0, agent_center[1] - cfg["agent_center"][1] * cfg["image_area_meters"][0] / pix_to_met)
+    tl_y = max(0, agent_center[0] - cfg["agent_center"][0] * cfg["image_area_meters"][1] / pix_to_met)
+    br_x = max(0, agent_center[1] + (1 - cfg["agent_center"][1]) * cfg["image_area_meters"][0] / pix_to_met)
+    br_y = max(0, agent_center[0] + (1 - cfg["agent_center"][0]) * cfg["image_area_meters"][1] / pix_to_met)
+    image_resize_coef = [cfg["image_shape"][0] / abs(tl_y - br_y), cfg["image_shape"][1] / abs(tl_y - br_y)]
+    # cropped = img.crop((tl_y, tl_x, br_y, br_x))
+    # mask_pil_cropped = mask_pil.crop((tl_y, tl_x, br_y, br_x))
+    # image_resize_coef = [cfg["image_shape"][0] / cropped.size[0], cfg["image_shape"][1] / cropped.size[1]]
 
-    br_y = min(size[0], max(0, agent_center[0] +
-                            (1 - cfg["agent_center"][0]) * cfg["image_area_meters"][1] / pix_to_met))
-    cropped = img.crop((tl_y, tl_x, br_y, br_x))
-
-    mask_pil_cropped = mask_pil.crop((tl_y, tl_x, br_y, br_x))
-    image_resize_coef = [cfg["image_shape"][0] / cropped.size[0], cfg["image_shape"][1] / cropped.size[1]]# cropped = img.crop((tl_y, tl_x, br_y, br_x))  #np_img[int(tl_x): int(br_x), int(tl_y): int(br_y)]
-
-    cropped = cropped.resize(cfg["image_shape"])
-    mask_pil_cropped = mask_pil_cropped.resize(cfg["image_shape"], 0)
-    return cropped, image_resize_coef, mask_pil_cropped
+    # cropped = cropped.resize(cfg["image_shape"])
+    # mask_pil_cropped = mask_pil_cropped.resize(cfg["image_shape"], 0)
+    return None, image_resize_coef, None, (tl_y, tl_x, br_y, br_x)
 
 
 def calc_transform_matrix(init_coord, angle, scale, output_shape: List):
@@ -195,26 +213,22 @@ def calc_transform_matrix(init_coord, angle, scale, output_shape: List):
 
 
 def sdd_crop_and_rotate(img: np.array, path, border_width=400, draw_traj=1, pix_to_m_cfg=SDD_scales,
-                         cropping_cfg=cropping_cfg, file=None, mask=None):
+                        cropping_cfg=cropping_cfg, file=None, mask=None):
     img_pil = Image.fromarray(np.asarray(img, dtype="uint8"))
     mask_pil = Image.fromarray(np.asarray(mask, dtype="uint8"))
     draw = ImageDraw.Draw(img_pil)
     scale_factor = 5
-    border = border_width//scale_factor
+    border = border_width // scale_factor
 
     scale = pix_to_m_cfg[file]["scale"]
     if draw_traj:
         R = 1
         for pose in path:
             if np.linalg.norm(pose - np.array([-1., -1.])) > 1e-6:
-                draw.ellipse((pose[0]/scale_factor - R, pose[1]/scale_factor - R,
-                              pose[0]/scale_factor + R, pose[1]/scale_factor + R),
+                draw.ellipse((pose[0] / scale_factor - R, pose[1] / scale_factor - R,
+                              pose[0] / scale_factor + R, pose[1] / scale_factor + R),
                              fill='blue', outline='blue')
 
-
-
-    # img_pil = img_pil.resize((img_pil.size[0]//scale_factor, img_pil.size[1]//scale_factor))
-    # mask_pil = mask_pil.resize((mask_pil.size[0] // scale_factor, mask_pil.size[1] // scale_factor), 0)
     img_pil = ImageOps.expand(img_pil, (border, border))
     mask_pil = ImageOps.expand(mask_pil, (border, border))
 
@@ -222,28 +236,30 @@ def sdd_crop_and_rotate(img: np.array, path, border_width=400, draw_traj=1, pix_
     if np.linalg.norm(path[1] - np.array([-1., -1.])) < 1e-6:
         angle_deg = 0
     angle_rad = angle_deg / 180 * math.pi
-    img_pil, map_to_local, mask_pil = rotate_image(img_pil, angle_deg, center=path[0]/scale_factor + border, mask=mask_pil)
-    crop_img, scale, crop_mask = crop_image(img_pil, cropping_cfg, agent_center=path[0]/scale_factor + border,
-                                            pix_to_met=scale*scale_factor, mask_pil=mask_pil)
+    asd, map_to_local, asd = rotate_image(None, angle_deg, center=path[0] / scale_factor + border, mask=None)
+    crop_img, scale, crop_mask, (tl_y, tl_x, br_y, br_x) = crop_image(img_pil, cropping_cfg,
+                                                                      agent_center=path[0] / scale_factor + border,
+                                                                      pix_to_met=scale * scale_factor,
+                                                                      mask_pil=mask_pil)
     for index in range(len(scale)):
-        scale[index] = scale[index]/scale_factor
+        scale[index] = scale[index] / scale_factor
     transf = calc_transform_matrix(path[0], angle_rad, scale, cropping_cfg["image_shape"])
     #     (init_coord, angle, scale, border_w=0):
-    return np.asarray(crop_img), transf, scale, np.asarray(crop_mask)
+    return np.asarray(img_pil), transf, scale, np.asarray(mask_pil), map_to_local, (tl_y, tl_x, br_y, br_x)
 
 
 def vis_pdf(image, distrib, transform_from_pix_to_m):
     dist_img = torch.zeros(image.shape[:2])
     for x in range(len(dist_img)):
         for y in range(len(dist_img[x])):
-            coord = transform_from_pix_to_m@torch.tensor([x,y,1.], dtype=torch.float)
-            dist_img[y,x] = torch.exp(distrib.log_prob(coord[:2]))
+            coord = transform_from_pix_to_m @ torch.tensor([x, y, 1.], dtype=torch.float)
+            dist_img[y, x] = torch.exp(distrib.log_prob(coord[:2]))
     return dist_img
 
 
-def heatmap2d_withiImg(arr, img, filename = None):
+def heatmap2d_withiImg(arr, img, filename=None):
     fig = plt.figure()
-    plt.imshow(img/255, alpha=1)
+    plt.imshow(img / 255, alpha=1)
     plt.imshow(arr.detach().cpu().numpy(), cmap='viridis', alpha=0.4)
     import io
     io_buf = io.BytesIO()
@@ -259,16 +275,16 @@ def heatmap2d_withiImg(arr, img, filename = None):
     # plt.savefig(filename)
     return img_arr
 
+
 def Psidom_mesh(rows, cols):
     return np.dstack(np.meshgrid(np.arange(rows), np.arange(cols), indexing='ij'))
 
 
 def vis_pdf2(image, distrib, transform_from_pix_to_m, index):
-
-    grid = Psidom_mesh(image.shape[0],image.shape[1])
-    grid = grid.reshape(image.shape[0]*image.shape[1], 2)[:, ::-1]
-    grid = transform_points(grid,torch.inverse(transform_from_pix_to_m))
-    tgrid = torch.tensor(grid,dtype=torch.float)
+    grid = Psidom_mesh(image.shape[0], image.shape[1])
+    grid = grid.reshape(image.shape[0] * image.shape[1], 2)[:, ::-1]
+    grid = transform_points(grid, torch.inverse(transform_from_pix_to_m))
+    tgrid = torch.tensor(grid, dtype=torch.float)
     mix = torch.distributions.Categorical(distrib.mixture_distribution.logits[index, :])
     mean = distrib.component_distribution.mean[index, :]
     cov_mat = distrib.component_distribution.covariance_matrix[index, :]
@@ -288,17 +304,18 @@ def vis_image_batched_Aleksander(images, distrs, raster_from_agent, goal_avail, 
             import cv2
             tgt_ = transform_points(tgt[i, -1:, :], raster_from_agent[i])
             try:
-                images[i] = cv2.ellipse(images[i].astype('float32'), ((int(tgt_[0, 0]), int(tgt_[0, 1])), (6, 6), 0), (40, 240, 50), thickness=-1)
+                images[i] = cv2.ellipse(images[i].astype('float32'), ((int(tgt_[0, 0]), int(tgt_[0, 1])), (6, 6), 0),
+                                        (40, 240, 50), thickness=-1)
             except Exception as E:
-                print ("cv2.ellipse: " + str(E))
+                print("cv2.ellipse: " + str(E))
             # cv2.ellipse(images[i], (tgt[0], tgt[1]), (3, 3), 0, 0, 360, (100, 100, 100), -1)
             visualized_image = vis_image_Aleksander(images[i], distrs, raster_from_agent[i], tgt, index=i)
-
 
             img.append(visualized_image)
             num_to_vis -= 1
             if num_to_vis == 0:
                 return img
+
 
 def vis_sigma_ellipses(np_im, pose_rasters, covs):
     pil_im = Image.fromarray(np.asarray(np_im, dtype="uint8"))
@@ -355,8 +372,8 @@ def plot2dcov(img, mu, Sigma, color='k', nSigmas=[1, 2, 3]):
 
     return np.asarray(pil_img, dtype="uint8")
 
-def vis_image_Aleksander(image, distr, raster_from_agent, tgt, index):
 
+def vis_image_Aleksander(image, distr, raster_from_agent, tgt, index):
     try:
         means_meters = distr.component_distribution.mean.detach().cpu().numpy()[index]
         cov_meters = distr.component_distribution.covariance_matrix.detach().cpu().numpy()[index]
@@ -373,12 +390,13 @@ def vis_image_Aleksander(image, distr, raster_from_agent, tgt, index):
 
     dist_image = vis_pdf2(image, distr, raster_from_agent, index=index)
     img_arr = heatmap2d_withiImg(dist_image, image)
-    return img_arr[:,:, :3]
+    return img_arr[:, :, :3]
+
 
 if __name__ == '__main__':
     image = torch.rand((224, 224, 3), dtype=torch.float)
-    transform_from_pix_to_m =torch.eye(3)
-    distr = torch.distributions.multivariate_normal.MultivariateNormal(torch.rand(2)+100, torch.eye(2)*50)
+    transform_from_pix_to_m = torch.eye(3)
+    distr = torch.distributions.multivariate_normal.MultivariateNormal(torch.rand(2) + 100, torch.eye(2) * 50)
     img_arr = vis_image_Aleksander(image, distr, transform_from_pix_to_m)
     plt.imshow(img_arr)
     plt.show()

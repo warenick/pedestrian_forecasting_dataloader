@@ -1,6 +1,6 @@
 import numpy as np
 from tqdm import tqdm
-
+import cv2
 
 class TrajnetLoader:
 
@@ -35,14 +35,20 @@ class TrajnetLoader:
         self.data_len = 0
         self.sub_data_len = [0]
         self.cfg = cfg
+        self.resize_datastes = {"SDD": 5}
+        self.img_size = {"SDD":(403, 396)}
+        self.loaded_imgs = {}
         print("loading files")
         for file in tqdm(data_files):
 
             if "SDD" in file:
                 try:
-                    name = path + "/" + file
+                    if path[-1] != "/":
+                        path+="/"
+                    name = path + file
                     new_name = name[:name.index(".")] + ".npy"
                     self.data[file] = np.load(new_name).astype(np.float32)
+
                 except:
                     self.data[file] = np.loadtxt(path + "/" + file, delimiter=' ', usecols=[0, 1, 2, 3, 4, 5]).astype(np.float32)
 
@@ -52,11 +58,25 @@ class TrajnetLoader:
                 self.data[file][:, 2] = (self.data[file][:, 2] + self.data[file][:, 4]) / 2
                 self.data[file][:, 3] = (self.data[file][:, 3] + self.data[file][:, 5]) / 2
                 self.data[file] = self.data[file][:, :4]
+
+                if cfg["raster_params"]["use_map"]:
+                    img = cv2.imread(name[:name.index(".")] + ".jpg").astype(np.int16)
+                    img = cv2.resize(img, (img.shape[1] // 5, img.shape[0] // 5), interpolation=0)
+                    unified_img = np.zeros((self.img_size["SDD"][0], self.img_size["SDD"][1], 3))
+                    unified_img[:img.shape[0], :img.shape[1], :] = img
+                    self.loaded_imgs[name[:name.index(".")] + ".jpg"] = unified_img
+
+                if cfg["raster_params"]["use_segm"]:
+                    img = np.load(name[:name.index(".")] + "_s.npy").astype(np.int16)
+                    img = cv2.resize(img, (img.shape[1] // 5, img.shape[0] // 5), interpolation=0)
+                    unified_img = np.zeros((self.img_size["SDD"][0], self.img_size["SDD"][1]))
+                    unified_img[:img.shape[0], :img.shape[1]] = img
+                    self.loaded_imgs[name[:name.index(".")] + "_s.npy"] = unified_img
             else:
                 self.data[file] = np.genfromtxt(path + "/" + file, delimiter='').astype(np.float32)
             self.data_len += len(self.data[file])
             self.sub_data_len.append(self.data_len)
-            self.loaded_imgs = {}
+
 
     def get_all_agents_with_timestamp(self, dataset_ind: int, timestamp: float) -> np.array:
 
@@ -174,7 +194,7 @@ class TrajnetLoader:
         return ped_id, ts
 
     def get_map(self, dataset_ind: int, ped_id: int, timestamp: float):
-        import cv2
+        # import cv2
         """
          :param dataset_ind: index of file
          :param ped_id: ID of agent
@@ -210,7 +230,6 @@ class TrajnetLoader:
                     if "SDD" in img_file:
                         segm = cv2.resize(segm, (segm.shape[1] // 5, segm.shape[0] // 5), interpolation=0)
                     self.loaded_imgs[segm_file] = segm
-                # segm[segm==0] = 1
 
             # img = Image.open(img_file)
             # img = np.asarray(img, dtype="int32")

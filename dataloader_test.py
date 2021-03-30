@@ -80,21 +80,23 @@ if __name__ == "__main__":
     from dataloader import  collate_wrapper
     import numpy as np
 
-    visualize_test()
+    # visualize_test()
     cfg["raster_params"]["use_map"] = True
     cfg["raster_params"]["normalize"] = True
     cfg["raster_params"]["use_segm"] = True
 
-    path_ = "/media/robot/hdd1/hdd_repos/pedestrian_forecasting_dataloader/data/train/"
+    # path_ = "/media/robot/hdd1/hdd_repos/pedestrian_forecasting_dataloader/data/train/"
+    path_ = "data/train/"
     files = [
         "SDD"
     ]
+
     for val_file in files:
         train_ds, val_ds = get_train_val_dataloaders(path_, cfg, val_file, False)
         from torch.utils.data import DataLoader
-        train_dataloader = DataLoader(train_ds, batch_size=512,
+        train_dataloader = DataLoader(train_ds, batch_size=128,
                                       shuffle=True, num_workers=0, collate_fn=collate_wrapper)
-        val_dataloader = DataLoader(val_ds, batch_size=512,
+        val_dataloader = DataLoader(val_ds, batch_size=128,
                                     shuffle=False, num_workers=0, collate_fn=collate_wrapper)
 
         train_poses = np.zeros((0,2))
@@ -107,7 +109,7 @@ if __name__ == "__main__":
             val_poses = np.concatenate((val_poses, data.history_positions[:,:,:2][data.history_av != 0].reshape(-1,2)))
             if num>10:
                 break
-
+        exit()
         n_bins = 60
 
         plt.hist(val_poses[:, 0], n_bins, alpha=0.5, label='val_poses')

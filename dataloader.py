@@ -454,10 +454,12 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         file = file[file.index("/") + 1:file.index(".")]
 
         globPix_to_locraster = np.eye(3)
+        tl_y, tl_x, br_y, br_x = (0, 0, 0, 0)
+        map_to_local = None
         if img is None:
             pass
         else:
-            img, globPix_to_locraster, scale, mask = sdd_crop_and_rotate(img, agent_history[:, 2:],
+            img, globPix_to_locraster, scale, mask, map_to_local, (tl_y, tl_x, br_y, br_x) = sdd_crop_and_rotate(img, agent_history[:, 2:],
                                                                    border_width=600,
                                                                    draw_traj=1,
                                                                    pix_to_m_cfg=self.cfg['SDD_scales'],
@@ -522,7 +524,10 @@ class DatasetFromTxt(torch.utils.data.Dataset):
                "world_from_agent": world_from_agent,
                "agent_from_world": agent_from_world,
                "loc_im_to_glob": np.linalg.inv(globPix_to_locraster),
-               "forces": transform_points(forces, rotation_matrix)}
+               "forces": transform_points(forces, rotation_matrix),
+
+               "map_affine": map_to_local,
+               "cropping_points": np.array([tl_y, tl_x, br_y, br_x])}
         return res
 
 
@@ -566,6 +571,19 @@ class UnifiedInterface:
                                    axis=0)
         except KeyError:
             self.forces = None
+
+        try:
+            self.map_affine = np.stack([np.array(data[i]["map_affine"]) for i in range(len(data))],
+                                        axis=0)
+        except KeyError:
+            self.map_affine = None
+
+        try:
+            self.cropping_points = np.stack([np.array(data[i]["cropping_points"]) for i in range(len(data))],
+                                        axis=0)
+        except KeyError:
+            self.cropping_points = None
+
         self.history_agents = NeighboursHistory([(data[i]["neighb"]) for i in range(len(data))]).get_history()
         self.history_agents_avail = [np.array(data[i]["neighb_avail"]) for i in range(len(data))]
         self.tgt = np.stack([np.array(data[i]["target"]) for i in range(len(data))], axis=0)
