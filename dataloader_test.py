@@ -21,6 +21,7 @@ def visualize_test():
         "SDD/bookstore_0.txt"
     ]
     path_ = "/media/robot/hdd1/hdd_repos/pedestrian_forecasting_dataloader/data/train/"
+    
     dataset = DatasetFromTxt(path_, files, cfg)
     # path_to_save = "/home/robot/repos/SDD_forces/192_192_f_n/"
     torch.manual_seed(42)

@@ -90,7 +90,8 @@ if __name__ == "__main__":
     cfg["raster_params"]["use_map"] = True
     cfg["raster_params"]["normalize"] = True
     cfg["raster_params"]["use_segm"] = True
-    path_ = "/media/robot/hdd1/hdd_repos/pedestrian_forecasting_dataloader/data/train"
+    path_ = "/media/robot/hdd1/hdd_repos/pedestrian_forecasting_dataloader/data/train/"
+    path_ = "/home/jovyan/ped_dataset/train/"
     train_ds, val_ds = get_train_val_dataloaders(path_, cfg, "SDD", False)
     train_dataloader = DataLoader(train_ds, batch_size=16,
                                   shuffle=True, num_workers=0, collate_fn=collate_wrapper)
