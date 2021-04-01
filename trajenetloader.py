@@ -1,6 +1,7 @@
 import numpy as np
 from tqdm import tqdm
 import cv2
+import matplotlib.pyplot as plt
 
 class TrajnetLoader:
 
@@ -36,6 +37,7 @@ class TrajnetLoader:
         self.sub_data_len = [0]
         self.cfg = cfg
         self.resize_datastes = {"SDD": 5}
+        self.border_datastes = {"SDD": 600}
         self.img_size = {"SDD":(403, 396)}
         self.loaded_imgs = {}
         print("loading files")
@@ -57,21 +59,35 @@ class TrajnetLoader:
                 self.data[file] = self.data[file][:, (5, 0, 1, 2, 3, 4)]
                 self.data[file][:, 2] = (self.data[file][:, 2] + self.data[file][:, 4]) / 2
                 self.data[file][:, 3] = (self.data[file][:, 3] + self.data[file][:, 5]) / 2
+
+
                 self.data[file] = self.data[file][:, :4]
 
                 if cfg["raster_params"]["use_map"]:
                     img = cv2.imread(name[:name.index(".")] + ".jpg").astype(np.int16)
                     img = cv2.resize(img, (img.shape[1] // 5, img.shape[0] // 5), interpolation=0)
-                    unified_img = np.zeros((self.img_size["SDD"][0], self.img_size["SDD"][1], 3))
+
+                    unified_img = np.zeros((self.img_size["SDD"][0], self.img_size["SDD"][1], 3), dtype=np.int16)
                     unified_img[:img.shape[0], :img.shape[1], :] = img
-                    self.loaded_imgs[name[:name.index(".")] + ".jpg"] = unified_img
+
+                    border = self.border_datastes["SDD"] // self.resize_datastes["SDD"]
+                    sh = unified_img.shape
+                    img_b = np.zeros((sh[0] + 2 * border, sh[1] + 2 * border, sh[2]), dtype=np.float32)
+                    img_b[border:-border, border:-border] = unified_img
+
+                    self.loaded_imgs[name[:name.index(".")] + ".jpg"] = img_b
 
                 if cfg["raster_params"]["use_segm"]:
                     img = np.load(name[:name.index(".")] + "_s.npy").astype(np.int16)
                     img = cv2.resize(img, (img.shape[1] // 5, img.shape[0] // 5), interpolation=0)
-                    unified_img = np.zeros((self.img_size["SDD"][0], self.img_size["SDD"][1]))
+                    unified_img = np.zeros((self.img_size["SDD"][0], self.img_size["SDD"][1]), dtype=np.int16)
                     unified_img[:img.shape[0], :img.shape[1]] = img
-                    self.loaded_imgs[name[:name.index(".")] + "_s.npy"] = unified_img
+
+                    border = self.border_datastes["SDD"] // self.resize_datastes["SDD"]
+                    sh = unified_img.shape
+                    img_b = np.zeros((sh[0] + 2 * border, sh[1] + 2 * border), dtype=np.float32)
+                    img_b[border:-border, border:-border] = unified_img
+                    self.loaded_imgs[name[:name.index(".")] + "_s.npy"] = img_b
             else:
                 self.data[file] = np.genfromtxt(path + "/" + file, delimiter='').astype(np.float32)
             self.data_len += len(self.data[file])
@@ -201,10 +217,6 @@ class TrajnetLoader:
          :param timestamp:  timestamp from txt file. Target future is [timespemp, timespemp + pred_len]
          :return:
         """
-        # 1. find file and imreadimage
-        # 2. rotate to allign with agent motion
-        # 3. crop with specified in cfg area (aka 5x5meters?)
-        # a. pixels to meters transformation?
         img = None
         if self.cfg["raster_params"]["use_map"]:
             txt_file = self.data_files[dataset_ind]
@@ -218,6 +230,7 @@ class TrajnetLoader:
                     segm_file = self.path + txt_file[0:txt_file.index(".")] + "_s.npy"
 
             if img_file not in self.loaded_imgs.keys():
+                print("run_time loading!")
                 img = cv2.imread(img_file).astype(np.int16)
                 if "SDD" in img_file:
                     img = cv2.resize(img, (img.shape[1]//5, img.shape[0]//5), interpolation=0)
@@ -225,7 +238,7 @@ class TrajnetLoader:
             segm = None
             if self.cfg["raster_params"]["use_segm"]:
                 if segm_file not in self.loaded_imgs.keys():
-
+                    print("run_time loading!")
                     segm = np.load(segm_file)
                     if "SDD" in img_file:
                         segm = cv2.resize(segm, (segm.shape[1] // 5, segm.shape[0] // 5), interpolation=0)
@@ -233,5 +246,9 @@ class TrajnetLoader:
 
             # img = Image.open(img_file)
             # img = np.asarray(img, dtype="int32")
-        return np.copy(self.loaded_imgs[img_file]), np.copy(self.loaded_imgs[segm_file])
+        if self.cfg["raster_params"]["use_segm"]:
+            return np.copy(self.loaded_imgs[img_file]), np.copy(self.loaded_imgs[segm_file])
+        else:
+            return np.copy(self.loaded_imgs[img_file]), None
+
 
