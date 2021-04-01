@@ -510,8 +510,14 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         raster_from_world = raster_from_agent @ agent_from_world
         agent_hist_localM, neigh_localM = self.calc_speed_accel(agent_hist_localM, neigh_localM, agent_hist_avail,
                                                                 hist_avail)
-        res = {"img": np.copy(img),
-               "segm": np.copy(mask),
+        res = [img, mask, agent_hist_localM, agent_hist_avail,target_localM, target_avil, neigh_localM,
+               hist_avail, np.linalg.inv(agent_from_raster), raster_from_world, world_from_agent, agent_from_world,
+               np.linalg.inv(globPix_to_locraster), transform_points(forces, rotation_matrix), map_to_local,
+               np.array([tl_y, tl_x, br_y, br_x])]
+        return res
+
+        res = {"img": img,
+               "segm": mask,
                "agent_hist": agent_hist_localM,
                "agent_hist_avail": agent_hist_avail,
                "target": target_localM,
@@ -552,54 +558,76 @@ class NeighboursHistory:
 
 class UnifiedInterface:
     def __init__(self, data):
-        if data[0]["img"] is None:
+        if data[0][0] is None:
             self.image = None
         else:
-            self.image = np.stack([np.array(data[i]["img"]) for i in range(len(data))], axis=0)
+            self.image = np.array([item[0] for item in data])
+            # self.image = np.stack([np.array(data[i]["img"]) for i in range(len(data))], axis=0)
 
         try:
-            self.segm = np.stack([np.array(data[i]["segm"]) for i in range(len(data))], axis=0)
+            # self.segm = np.stack([np.array(data[i]["segm"]) for i in range(len(data))], axis=0)
+            if data[0][1] is None:
+                self.segm = None
+            else:
+                self.segm = np.array([item[1] for item in data])
         except KeyError:
             self.segm = None
-        self.history_positions = np.stack([np.array(data[i]["agent_hist"]) for i in range(len(data))],
-                                          axis=0)
-        self.history_av = np.stack([np.array(data[i]["agent_hist_avail"]) for i in range(len(data))],
-                                   axis=0)
+        self.history_positions = np.array([item[2] for item in data])
+        # self.history_positions = np.stack([np.array(data[i]["agent_hist"]) for i in range(len(data))],
+        #                                   axis=0)
+        self.history_av = np.array([item[3] for item in data])
+        # self.history_av = np.stack([np.array(data[i]["agent_hist_avail"]) for i in range(len(data))],
+        #                            axis=0)
 
         try:
-            self.forces = np.stack([np.array(data[i]["forces"]) for i in range(len(data))],
-                                   axis=0)
+            self.forces = np.array([item[13] for item in data])
+            # self.forces = np.stack([np.array(data[i]["forces"]) for i in range(len(data))],
+            #                        axis=0)
         except KeyError:
             self.forces = None
 
         try:
-            self.map_affine = np.stack([np.array(data[i]["map_affine"]) for i in range(len(data))],
-                                        axis=0)
+            self.map_affine = np.array([item[14] for item in data])
+            # self.map_affine = np.stack([np.array(data[i]["map_affine"]) for i in range(len(data))],
+            #                             axis=0)
         except KeyError:
             self.map_affine = None
 
         try:
-            self.cropping_points = np.stack([np.array(data[i]["cropping_points"]) for i in range(len(data))],
-                                        axis=0)
+            self.cropping_points = np.array([item[15] for item in data])
+            # self.cropping_points = np.stack([np.array(data[i]["cropping_points"]) for i in range(len(data))],
+            #                             axis=0)
         except KeyError:
             self.cropping_points = None
 
-        self.history_agents = NeighboursHistory([(data[i]["neighb"]) for i in range(len(data))]).get_history()
-        self.history_agents_avail = [np.array(data[i]["neighb_avail"]) for i in range(len(data))]
-        self.tgt = np.stack([np.array(data[i]["target"]) for i in range(len(data))], axis=0)
-        self.tgt_avail = np.stack([np.array(data[i]["target_avil"]) for i in range(len(data))], axis=0)
-        self.world_to_image = None  # torch.stack([torch.tensor(data[i]["world_to_image"]) for i in range(len(data))], dim=0)
-        self.raster_from_agent = np.stack([np.array(data[i]["raster_from_agent"]) for i in range(len(data))],
-                                          axis=0)
-        self.raster_from_world = np.stack([np.array(data[i]["raster_from_world"]) for i in range(len(data))],
-                                          axis=0)
-        self.agent_from_world = np.stack([np.array(data[i]["agent_from_world"]) for i in range(len(data))],
-                                         axis=0)
-        self.world_from_agent = np.stack([np.array(data[i]["world_from_agent"]) for i in range(len(data))],
-                                         axis=0)
+        self.history_agents = NeighboursHistory([(data[i][6]) for i in range(len(data))]).get_history()
+        # self.history_agents = NeighboursHistory([(data[i]["neighb"]) for i in range(len(data))]).get_history()
 
-        self.loc_im_to_glob = np.stack([np.array(data[i]["loc_im_to_glob"]) for i in range(len(data))],
-                                       axis=0)
+        self.history_agents_avail = np.array([item[7] for item in data])
+        # self.history_agents_avail = [np.array(data[i]["neighb_avail"]) for i in range(len(data))]
+
+        self.tgt = np.array([item[4] for item in data])
+        # self.tgt = np.stack([np.array(data[i]["target"]) for i in range(len(data))], axis=0)
+        self.tgt_avail = np.array([item[5] for item in data])
+        # self.tgt_avail = np.stack([np.array(data[i]["target_avil"]) for i in range(len(data))], axis=0)
+
+        self.raster_from_agent = np.array([item[8] for item in data])
+        # self.raster_from_agent = np.stack([np.array(data[i]["raster_from_agent"]) for i in range(len(data))],
+        #                                   axis=0)
+        self.raster_from_world = np.array([item[9] for item in data])
+        # self.raster_from_world = np.stack([np.array(data[i]["raster_from_world"]) for i in range(len(data))],
+        #                                   axis=0)
+        self.agent_from_world = np.array([item[11] for item in data])
+        # self.agent_from_world = np.stack([np.array(data[i]["agent_from_world"]) for i in range(len(data))],
+        #                                  axis=0)
+        self.world_from_agent = np.array([item[10] for item in data])
+        # self.world_from_agent = np.stack([np.array(data[i]["world_from_agent"]) for i in range(len(data))],
+        #                                  axis=0)
+        self.loc_im_to_glob = np.array([item[12] for item in data])
+        # self.loc_im_to_glob = np.stack([np.array(data[i]["loc_im_to_glob"]) for i in range(len(data))],
+        #                                axis=0)
+
+        self.world_to_image = None  # torch.stack([torch.tensor(data[i]["world_to_image"]) for i in range(len(data))], dim=0)
         self.centroid = None
         self.extent = None
         self.yaw = None

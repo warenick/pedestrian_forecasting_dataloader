@@ -15,28 +15,37 @@ except:
 import kornia
 
 
-def preprocess_data(data, device="cpu") -> torch.tensor:
-    imgs_tensor = (torch.tensor(data.image).permute(0, 3, 1, 2).float() / 255).to(device)
+def preprocess_data(data, cfg, device="cpu") -> torch.tensor:
+    imgs_tensor = (torch.tensor(data.image, device=device).permute(0, 3, 1, 2)/255.)
+    if data.segm is not None:
+        mask_tensor = (torch.tensor(data.segm, device=device).unsqueeze(1) / 255.)
+        imgs_tensor = torch.cat((imgs_tensor, mask_tensor), dim=1)
     bs = imgs_tensor.shape[0]
     cropping_points = data.cropping_points
-    bboxes = torch.zeros((bs, 4, 2)).to(device)
-    bboxes[:, 0, :] = torch.tensor([cropping_points[:, 0], cropping_points[:, 1]]).permute(1, 0)
-    bboxes[:, 1, :] = torch.tensor([cropping_points[:, 2], cropping_points[:, 1]]).permute(1, 0)
-    bboxes[:, 2, :] = torch.tensor([cropping_points[:, 2], cropping_points[:, 3]]).permute(1, 0)
-    bboxes[:, 3, :] = torch.tensor([cropping_points[:, 0], cropping_points[:, 3]]).permute(1, 0)
-    transf = torch.tensor(data.map_affine)[:, :2, :].float().to(device)
-    dst_bboxes = torch.tensor([[[0., 0], [224, 0], [224, 224], [0, 224]]]).repeat(bs, 1, 1)
+    bboxes = torch.zeros((bs, 4, 2), device=device)
+    bboxes[:, 0, :] = torch.tensor([cropping_points[:, 0], cropping_points[:, 1]], device=device).permute(1, 0)
+    # bboxes[:, 0, :] = torch.stack([torch.tensor(cropping_points[:, 0]), torch.tensor(cropping_points[:, 1])], dim=1)
+    bboxes[:, 1, :] = torch.tensor([cropping_points[:, 2], cropping_points[:, 1]], device=device).permute(1, 0)
+    bboxes[:, 2, :] = torch.tensor([cropping_points[:, 2], cropping_points[:, 3]], device=device).permute(1, 0)
+    bboxes[:, 3, :] = torch.tensor([cropping_points[:, 0], cropping_points[:, 3]], device=device).permute(1, 0)
+    transf = torch.tensor(data.map_affine, device=device)[:, :2, :].float()
+    new_size = cfg["cropping_cfg"]["image_shape"]
+    dst_bboxes = torch.tensor([[[0., 0], [new_size[0], 0], [new_size[0], new_size[1]], [0, new_size[1]]]], device=device).repeat(bs, 1, 1)
     flags = {}
     flags['interpolation'] = torch.tensor([0]).to(device)
     flags['align_corners'] = torch.ones(1).bool().to(device)
 
-    params = {"src": bboxes.to(device),
-              "dst": dst_bboxes.to(device)
+    params = {"src": bboxes,
+              "dst": dst_bboxes
               }
 
     imgs = kornia.warp_affine(imgs_tensor, transf, mode="nearest", dsize=imgs_tensor.shape[2:])
     imgs = kornia.apply_crop(imgs, params, flags)
-    return imgs
+    mask_tensor = None
+    if data.segm is not None:
+        mask_tensor = imgs[:, 3:4]
+        imgs = imgs[:, :3]
+    return imgs, mask_tensor
 
 
 def transform_points2d(points: np.array, transform: np.array):
@@ -211,41 +220,58 @@ def calc_transform_matrix(init_coord, angle, scale, output_shape: List):
     transf = d @ c @ b @ a
     return transf
 
-
+import cv2
 def sdd_crop_and_rotate(img: np.array, path, border_width=400, draw_traj=1, pix_to_m_cfg=SDD_scales,
                         cropping_cfg=cropping_cfg, file=None, mask=None):
-    img_pil = Image.fromarray(np.asarray(img, dtype="uint8"))
-    mask_pil = Image.fromarray(np.asarray(mask, dtype="uint8"))
-    draw = ImageDraw.Draw(img_pil)
+    # print(img.dtype)
+    # img_pil = Image.fromarray(np.asarray(img, dtype="uint8"))
+    # mask_pil = Image.fromarray(np.asarray(mask, dtype="uint8"))
+    # draw = ImageDraw.Draw(img_pil)
     scale_factor = 5
-    border = border_width // scale_factor
+    scaled_border = border_width // scale_factor
 
     scale = pix_to_m_cfg[file]["scale"]
-    if draw_traj:
-        R = 1
-        for pose in path:
-            if np.linalg.norm(pose - np.array([-1., -1.])) > 1e-6:
-                draw.ellipse((pose[0] / scale_factor - R, pose[1] / scale_factor - R,
-                              pose[0] / scale_factor + R, pose[1] / scale_factor + R),
-                             fill='blue', outline='blue')
-
-    img_pil = ImageOps.expand(img_pil, (border, border))
-    mask_pil = ImageOps.expand(mask_pil, (border, border))
+    draw_h(draw_traj, img, path, scale_factor, scaled_border)
+    # img_b, mask_b = expand(border, img, mask)
+    # mask_pil = ImageOps.expand(mask_pil, (border, border))
 
     angle_deg = trajectory_orientation(path[0], path[1])
     if np.linalg.norm(path[1] - np.array([-1., -1.])) < 1e-6:
         angle_deg = 0
     angle_rad = angle_deg / 180 * math.pi
-    asd, map_to_local, asd = rotate_image(None, angle_deg, center=path[0] / scale_factor + border, mask=None)
-    crop_img, scale, crop_mask, (tl_y, tl_x, br_y, br_x) = crop_image(img_pil, cropping_cfg,
-                                                                      agent_center=path[0] / scale_factor + border,
+    asd, map_to_local, asd = rotate_image(None, angle_deg, center=path[0] / scale_factor + scaled_border, mask=None)
+    crop_img, scale, crop_mask, (tl_y, tl_x, br_y, br_x) = crop_image(img, cropping_cfg,
+                                                                      agent_center=path[0] / scale_factor + scaled_border,
                                                                       pix_to_met=scale * scale_factor,
-                                                                      mask_pil=mask_pil)
+                                                                      mask_pil=mask)
     for index in range(len(scale)):
         scale[index] = scale[index] / scale_factor
     transf = calc_transform_matrix(path[0], angle_rad, scale, cropping_cfg["image_shape"])
     #     (init_coord, angle, scale, border_w=0):
-    return np.asarray(img_pil), transf, scale, np.asarray(mask_pil), map_to_local, (tl_y, tl_x, br_y, br_x)
+    return img, transf, scale, mask, map_to_local, (tl_y, tl_x, br_y, br_x)
+
+
+def expand(border, img, mask):
+    sh = img.shape
+    img_b = np.zeros((sh[0] + 2 * border, sh[1] + 2 * border, sh[2]), dtype=np.float32)
+    img_b[border:-border, border:-border] = img
+    # img_pil = ImageOps.expand(img_pil, (border, border))
+    sh = mask.shape
+    mask_b = np.zeros((sh[0] + 2 * border, sh[1] + 2 * border), dtype=np.float32)
+    mask_b[border:-border, border:-border] = mask
+    return img_b, mask_b
+
+
+def draw_h(draw_traj, img, path, scale_factor, border):
+    if draw_traj:
+        R = 1
+        for pose in path:
+            if np.linalg.norm(pose - np.array([-1., -1.])) > 1e-6:
+                pass
+                cv2.circle(img, (int(pose[0] / scale_factor + border), int(pose[1] / scale_factor + border)), R, (0, 0, 255), 1)
+                # draw.ellipse((pose[0] / scale_factor - R, pose[1] / scale_factor - R,
+                #               pose[0] / scale_factor + R, pose[1] / scale_factor + R),
+                #              fill='blue', outline='blue')
 
 
 def vis_pdf(image, distrib, transform_from_pix_to_m):
