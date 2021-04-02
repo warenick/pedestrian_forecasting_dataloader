@@ -106,7 +106,7 @@ class TrajnetLoader:
         data = self.data[file]
         return data[data[:, self.ts_row] == timestamp][:, self.index_row]
 
-    def get_agent_history(self, dataset_ind: int, ped_id: int, timestamp: float) -> np.array:
+    def get_agent_history(self, dataset_ind: int, ped_id: int, timestamp: float, neighb_indexes) -> np.array:
 
         """
          :param dataset_ind: index of file
@@ -114,6 +114,7 @@ class TrajnetLoader:
          :param timestamp:  timestamp from txt file. Observed history is [timespemp - history_len, timespemp]
          :return: observed trajectory of specified agent np.array shape(self.history_len+1,4).
         """
+        neighb_indexes = neighb_indexes[neighb_indexes != ped_id]
         # import time
         # st = time.time()
         file = self.data_files[dataset_ind]
@@ -125,36 +126,48 @@ class TrajnetLoader:
         #         if self.cfg["raster_params"]["use_map"] == True:
         # print(st - time.time())
         # st = time.time()
-        ind_start = np.searchsorted(data[:, self.index_row], ped_id)
-        ind_stop = np.searchsorted(data[:, self.index_row], ped_id + 1)
-        data = data[ind_start:ind_stop, :]  # filter by index
-
-
-        # data = data[data[:, self.index_row] == ped_id]  # filter by index
-        data = data[(data[:, self.ts_row] > start_ts)]  # filter by timestamp
-        data = data[data[:, self.ts_row] <= timestamp]
-        # data = np.argwhere(data[:, self.ts_row] > start_ts)
-        # data = np.argwhere(data[:, self.index_row] == ped_id)
-        # data = np.argwhere(data[:, self.ts_row] <= timestamp)
-
-        # print(st - time.time())
-        # st = time.time()
-        if "eth" in file:
-            data = data[:, (0, 1, 2, 4)]
-        if ("zara01" in file) or ("zara02" in file):
-            data = data[:, (0, 1, 2, 4)]
-        # if ("SDD" in file):
-
-        # if ("students03" in file):
-        #     data = data[:, (0, 1, 2, 4)]
         timecoef = self.delta_timestamp[file[0:file.index("/")]] * self.delta_t[file[0:file.index("/")]]
-        out = np.zeros((int(self.history_len / timecoef), 4)) - 1
-        out[0:len(data), :] = np.flip(data, axis=0)
-        # print(st - time.time())
+        full_hist_scene = (np.zeros((int(self.history_len / timecoef), 4)) - 1)[np.newaxis]
+        start_stop_ped_ind = [ped_id, ped_id+1]
+        for ind in neighb_indexes:
+            start_stop_ped_ind.append(ind)
+            start_stop_ped_ind.append(ind+1)
 
-        return out
+        ind = np.searchsorted(data[:, self.index_row], start_stop_ped_ind)
+        # ind_start = np.searchsorted(data[:, self.index_row], start_stop_ped_ind)
+        indexes_start = ind[::2]
+        # ind_stop = np.searchsorted(data[:, self.index_row], ped_id + 1)
+        indexes_stop = ind[1::2]
 
-    def get_agent_future(self, dataset_ind: int, ped_id: int, timestamp: float) -> np.array:
+        for ind_start, ind_stop in zip(indexes_start, indexes_stop):
+            data_ = data[ind_start:ind_stop, :]  # filter by index
+
+
+
+            data_ = data_[(data_[:, self.ts_row] > start_ts)]  # filter by timestamp
+            data_ = data_[data_[:, self.ts_row] <= timestamp]
+            # data = np.argwhere(data[:, self.ts_row] > start_ts)
+            # data = np.argwhere(data[:, self.index_row] == ped_id)
+            # data = np.argwhere(data[:, self.ts_row] <= timestamp)
+
+            # print(st - time.time())
+            # st = time.time()
+            if "eth" in file:
+                data_ = data_[:, (0, 1, 2, 4)]
+            if ("zara01" in file) or ("zara02" in file):
+                data_ = data_[:, (0, 1, 2, 4)]
+            # if ("SDD" in file):
+
+            # if ("students03" in file):
+            #     data = data[:, (0, 1, 2, 4)]
+            timecoef = self.delta_timestamp[file[0:file.index("/")]] * self.delta_t[file[0:file.index("/")]]
+            out = np.zeros((int(self.history_len / timecoef), 4)) - 1
+            out[0:len(data_), :] = np.flip(data_, axis=0)
+            full_hist_scene = np.concatenate((full_hist_scene, out[np.newaxis]), axis=0)
+
+        return full_hist_scene[1:]
+
+    def get_agent_future(self, dataset_ind: int, ped_id: int, timestamp: float, neighb_indexes) -> np.array:
         """
          :param dataset_ind: index of file
          :param ped_id: ID of agent
@@ -166,23 +179,36 @@ class TrajnetLoader:
         end_timestamp = timestamp + (
                 self.pred_len / self.delta_t[file[0:file.index("/")]])  # self.delta_t[file[0:file.index("/")]])
         data = self.data[file]
-
-        ind_start = np.searchsorted(data[:, self.index_row], ped_id)
-        ind_stop = np.searchsorted(data[:, self.index_row], ped_id + 1)
-        data = data[ind_start:ind_stop, :]  # filter by index
-
-        data = data[(data[:, self.ts_row] <= end_timestamp)]  # filter by timestamp
-        data = data[data[:, self.ts_row] > timestamp]
-        if "eth" in file:
-            data = data[:, (0, 1, 2, 4)]
-        if ("zara01" in file) or ("zara02" in file):
-            data = data[:, (0, 1, 2, 4)]
-        # if ("students03" in file):
-        #     data = data[:, (0, 1, 2, 4)]
         timecoef = self.delta_timestamp[file[0:file.index("/")]] * self.delta_t[file[0:file.index("/")]]
-        out = np.zeros((int(round(self.pred_len / timecoef)), 4)) - 1
-        out[0:len(data), :] = np.array(data)
-        return out
+        full_future_scene = (np.zeros((round(self.pred_len / timecoef), 4)) - 1)[np.newaxis]
+        start_stop_ped_ind = [ped_id, ped_id + 1]
+        for ind in neighb_indexes:
+            start_stop_ped_ind.append(ind)
+            start_stop_ped_ind.append(ind + 1)
+        ind = np.searchsorted(data[:, self.index_row], start_stop_ped_ind)
+        indexes_start = ind[::2]
+        indexes_stop = ind[1::2]
+
+        # ind_start = np.searchsorted(data[:, self.index_row], ped_id)
+        # ind_stop = np.searchsorted(data[:, self.index_row], ped_id + 1)
+        # data = data[ind_start:ind_stop, :]  # filter by index
+        for ind_start, ind_stop in zip(indexes_start, indexes_stop):
+            data_ = data[ind_start:ind_stop, :]  # filter by index
+
+
+            data_ = data_[(data_[:, self.ts_row] <= end_timestamp)]  # filter by timestamp
+            data_ = data_[data_[:, self.ts_row] > timestamp]
+            if "eth" in file:
+                data_ = data_[:, (0, 1, 2, 4)]
+            if ("zara01" in file) or ("zara02" in file):
+                data_ = data_[:, (0, 1, 2, 4)]
+            # if ("students03" in file):
+            #     data = data[:, (0, 1, 2, 4)]
+
+            out = np.zeros((int(round(self.pred_len / timecoef)), 4)) - 1
+            out[0:len(data_), :] = np.array(data_)
+            full_future_scene = np.concatenate((full_future_scene, out[np.newaxis]), axis=0)
+        return full_future_scene[1:]
 
     def get_subdataset_ts_separator(self, index: int) -> int:
         """

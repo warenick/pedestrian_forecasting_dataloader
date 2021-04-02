@@ -23,7 +23,7 @@ except:
 
 import math
 from tqdm import tqdm
-
+import os
 
 
 torch.multiprocessing.set_sharing_strategy('file_system')
@@ -45,37 +45,46 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         return self.loader.data_len
 
     def __getitem__(self, index: int):
+        # print(os.getpid(), 1)
         dataset_index = self.loader.get_subdataset_ts_separator(index)
         file = self.files[dataset_index]
         ped_id, ts = self.loader.get_pedId_and_timestamp_by_index(dataset_index, index)
-        agent_history = self.loader.get_agent_history(dataset_index, ped_id, ts)
-        agent_future = self.loader.get_agent_future(dataset_index, ped_id, ts)
         indexes = self.loader.get_all_agents_with_timestamp(dataset_index, ts)
-        indexes = indexes[indexes != ped_id]
-        others_history = []
-        others_future = []
+        agents_history = self.loader.get_agent_history(dataset_index, ped_id, ts, indexes)
+        agents_future = self.loader.get_agent_future(dataset_index, ped_id, ts, indexes)
+        # agents_history = np.ones((10,8,4), dtype=np.float32)
+        # agents_future = np.ones((10,12,4), dtype=np.float32)
+        agent_history = agents_history[0]
+        agent_future = agents_future[0]
+        time_sorted_hist = np.array(agents_history[1:])  # sort_neigh_history(others_history)
+        time_sorted_future = np.array(agents_future[1:])  # sort_neigh_future(others_future)
+        # indexes = indexes[indexes != ped_id]
+        # others_history = []
+        # others_future = []
         forces = np.zeros(6)
         if self.use_forces:
             forces = self.force_from_txt.get(index)
 
-        for index in indexes:
-            history = self.loader.get_agent_history(dataset_index, index, ts)
-            others_history.append(history)
-            future = self.loader.get_agent_future(dataset_index, index, ts)
-            others_future.append(future)
+        # for index in indexes:
+        #     history = self.loader.get_agent_history(dataset_index, index, ts)
+        #     others_history.append(history)
+        #     future = self.loader.get_agent_future(dataset_index, index, ts)
+        #     others_future.append(future)
 
-        if others_history == []:
-            others_history = np.zeros((0, 9, 4))
-            others_future = np.zeros((0, 12, 4))
+        if len(time_sorted_future) == 0:
+            time_sorted_future = np.zeros((0, 9, 4))
+        if len(time_sorted_hist) == 0:
+            time_sorted_hist = np.zeros((0, 9, 4))
+        #     others_future = np.zeros((0, 12, 4))
 
-        time_sorted_hist = np.array(others_history)  # sort_neigh_history(others_history)
-        time_sorted_future = np.array(others_future)  # sort_neigh_future(others_future)
+
         agent_hist_avail = (agent_history[:, 0] != -1).astype(int)
         target_avil = (agent_future[:, 0] != -1).astype(int)
         hist_avail = (time_sorted_hist[:, :, 0] != -1).astype(int)
         neighb_future_avail = (time_sorted_future[:, :, 0] != -1).astype(int)
         img, mask = self.loader.get_map(dataset_index, ped_id, ts)
-
+        # img = np.ones((600,600,3), dtype=np.float32)
+        # mask = np.ones((600,600) , dtype=np.float32)
         if not self.cfg["raster_params"]["use_map"]:
             if "zara" in file:
                 pix_to_m = self.cfg["zara_h"]
@@ -373,8 +382,10 @@ class DatasetFromTxt(torch.utils.data.Dataset):
 
         if ("stanford" in file) or ("SDD" in file):
             if self.cfg["raster_params"]["normalize"]:
+                # print(os.getpid(), 2)
                 res = self.crop_and_normilize(agent_future, agent_hist_avail, agent_history, file, hist_avail, img,
                                               target_avil, time_sorted_hist, forces, mask)
+                # print(os.getpid(), 3)
 
             else:
 
@@ -516,25 +527,25 @@ class DatasetFromTxt(torch.utils.data.Dataset):
                np.array([tl_y, tl_x, br_y, br_x])]
         return res
 
-        res = {"img": img,
-               "segm": mask,
-               "agent_hist": agent_hist_localM,
-               "agent_hist_avail": agent_hist_avail,
-               "target": target_localM,
-               "target_avil": target_avil,
-               "neighb": neigh_localM,
-               "neighb_avail": hist_avail,
-
-               "raster_from_agent": np.linalg.inv(agent_from_raster),
-               "raster_from_world": raster_from_world,
-               "world_from_agent": world_from_agent,
-               "agent_from_world": agent_from_world,
-               "loc_im_to_glob": np.linalg.inv(globPix_to_locraster),
-               "forces": transform_points(forces, rotation_matrix),
-
-               "map_affine": map_to_local,
-               "cropping_points": np.array([tl_y, tl_x, br_y, br_x])}
-        return res
+        # res = {"img": img,
+        #        "segm": mask,
+        #        "agent_hist": agent_hist_localM,
+        #        "agent_hist_avail": agent_hist_avail,
+        #        "target": target_localM,
+        #        "target_avil": target_avil,
+        #        "neighb": neigh_localM,
+        #        "neighb_avail": hist_avail,
+        # 
+        #        "raster_from_agent": np.linalg.inv(agent_from_raster),
+        #        "raster_from_world": raster_from_world,
+        #        "world_from_agent": world_from_agent,
+        #        "agent_from_world": agent_from_world,
+        #        "loc_im_to_glob": np.linalg.inv(globPix_to_locraster),
+        #        "forces": transform_points(forces, rotation_matrix),
+        # 
+        #        "map_affine": map_to_local,
+        #        "cropping_points": np.array([tl_y, tl_x, br_y, br_x])}
+        # return res
 
 
 class NeighboursHistory:
@@ -555,9 +566,67 @@ class NeighboursHistory:
             poses.append([self.history_agents[batch][i] for i in range(1, len(self.history_agents[batch]))])
         return poses
 
-
+import time
+#
+# class UnifiedInterface:
+#     def __init__(self, data):
+#         st = time.time()
+#         if data[0]["img"] is None:
+#             self.image = None
+#         else:
+#             self.image = np.stack([np.array(data[i]["img"]) for i in range(len(data))], axis=0)
+#         self.segm = np.stack([np.array(data[i]["segm"]) for i in range(len(data))], axis=0)
+#         self.history_positions = np.stack([np.array(data[i]["agent_hist"]) for i in range(len(data))],
+#                                           axis=0)
+#         self.history_av = np.stack([np.array(data[i]["agent_hist_avail"]) for i in range(len(data))],
+#                                    axis=0)
+#
+#         try:
+#             self.forces = np.stack([np.array(data[i]["forces"]) for i in range(len(data))],
+#                                    axis=0)
+#         except:
+#             self.forces = None
+#         self.history_agents = NeighboursHistory([(data[i]["neighb"]) for i in range(len(data))]).get_history()
+#         self.history_agents_avail = [np.array(data[i]["neighb_avail"]) for i in range(len(data))]
+#         self.tgt = np.stack([np.array(data[i]["target"]) for i in range(len(data))], axis=0)
+#         self.tgt_avail = np.stack([np.array(data[i]["target_avil"]) for i in range(len(data))], axis=0)
+#         self.world_to_image = None  # torch.stack([torch.tensor(data[i]["world_to_image"]) for i in range(len(data))], dim=0)
+#         self.raster_from_agent = np.stack([np.array(data[i]["raster_from_agent"]) for i in range(len(data))],
+#                                           axis=0)
+#         self.raster_from_world = np.stack([np.array(data[i]["raster_from_world"]) for i in range(len(data))],
+#                                           axis=0)
+#         self.agent_from_world = np.stack([np.array(data[i]["agent_from_world"]) for i in range(len(data))],
+#                                          axis=0)
+#         self.world_from_agent = np.stack([np.array(data[i]["world_from_agent"]) for i in range(len(data))],
+#                                          axis=0)
+#
+#         self.loc_im_to_glob = np.stack([np.array(data[i]["loc_im_to_glob"]) for i in range(len(data))],
+#                                        axis=0)
+#         self.centroid = None
+#         self.extent = None
+#         self.yaw = None
+#         self.speed = None
+#         try:
+#             self.map_affine = np.stack([np.array(data[i]["map_affine"]) for i in range(len(data))],
+#                                        axis=0)
+#         except KeyError:
+#             self.map_affine = None
+#
+#         try:
+#             self.cropping_points = np.stack([np.array(data[i]["cropping_points"]) for i in range(len(data))],
+#                                             axis=0)
+#         except KeyError:
+#             self.cropping_points = None
+#         try:
+#             self.agent_ts_id = np.stack([np.array(data[i]["agent_ts_id"]) for i in range(len(data))],
+#                                        axis=0)
+#         except KeyError:
+#             self.agent_ts_id = None
+#         # print(time.time() - st)
+# #
 class UnifiedInterface:
     def __init__(self, data):
+        st = time.time()
         if data[0][0] is None:
             self.image = None
         else:
