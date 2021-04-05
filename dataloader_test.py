@@ -6,6 +6,7 @@ from dataloader import DatasetFromTxt
 from utils import transform_points
 from tqdm import tqdm
 import torch
+import cv2
 
 draw_n = 1
 draw_a_h = 1
@@ -30,20 +31,24 @@ def visualize_test():
         ind = int(np.random.rand() * len(dataset))
         data = dataset[ind]
 
-        img = Image.fromarray(np.asarray(data["img"], dtype="uint8"))
+        data[0] = cv2.warpAffine(data[0], data[14][:2, :], (data[0].shape[1], data[0].shape[0]))
+        data[0] = data[0][int(data[15][1]):int(data[15][3]), int(data[15][0]):int(data[15][2])]
+        data[0] = cv2.resize(data[0], (336, 336))
+        img = Image.fromarray(np.asarray(data[0], dtype="uint8"))
         draw = ImageDraw.Draw(img)
-
+        if data[3][1] == 0:
+            continue
         if draw_a_h:
-            for num, pose in enumerate(data["agent_hist"]):
-                if data["agent_hist_avail"][num]:
+            for num, pose in enumerate(data[2]):
+                if data[3][num]:
                     # pose = data["glob_to_local"] @ np.array([pose[0], pose[1], 1.])
-                    pose_raster = data["raster_from_agent"] @ np.array([pose[0], pose[1], 1.])
+                    pose_raster = data[8] @ np.array([pose[0], pose[1], 1.])
                     draw.ellipse(
                         (pose_raster[0] - Rad, pose_raster[1] - Rad, pose_raster[0] + Rad, pose_raster[1] + Rad),
                         fill='red', outline='red')
                     # if num == 0:
                     if draw_speeds:
-                        import cv2
+
                         na = np.asarray(img)
                         if (np.sum(data["agent_speed"][num] ** 2) > 1e-6) and (
                                 data["agent_hist_avail"][num] * data["agent_hist_avail"][num + 1]):
@@ -55,10 +60,10 @@ def visualize_test():
                             draw = ImageDraw.Draw(img)
 
         if draw_n:
-            for ped in range(0, data["neighb"].shape[0]):
-                for num, pose in enumerate(data["neighb"][ped, :, :]):
-                    if data["neighb_avail"][ped, num]:
-                        pose_raster = data["raster_from_agent"] @ np.array([pose[0], pose[1], 1.])
+            for ped in range(0, data[6].shape[0]):
+                for num, pose in enumerate(data[6][ped, :, :]):
+                    if data[7][ped, num]:
+                        pose_raster = data[8] @ np.array([pose[0], pose[1], 1.])
                         rgb = (int(255 * ((num + 1) / 8)), int(255 * ((num + 1) / 8)), int(255 * ((num + 1) / 8)))
                         # draw.ellipse((pose_raster[0] - Rad, pose_raster[1] - Rad, pose_raster[0] + Rad, pose_raster[1] + Rad), fill='#ffcc99', outline='#ffcc99')
                         draw.ellipse(
@@ -66,22 +71,22 @@ def visualize_test():
                             fill=rgb, outline='#ffcc99')
 
         if draw_targets:
-            for num, pose in enumerate(data["target"]):
-                if data["target_avil"][num]:
+            for num, pose in enumerate(data[4]):
+                if data[5][num]:
                     R = 4
                     # pose = data["glob_to_local"] @ np.array([pose[0], pose[1], 1.])
-                    pose_raster = data["raster_from_agent"] @ np.array([pose[0], pose[1], 1.])
+                    pose_raster = data[8] @ np.array([pose[0], pose[1], 1.])
                     draw.ellipse(
                         (pose_raster[0] - Rad, pose_raster[1] - Rad, pose_raster[0] + Rad, pose_raster[1] + Rad),
                         fill='#33cc33', outline='#33cc33')
-        img.show()
+        img.save(str(i)+".jpg")
         print()
 if __name__ == "__main__":
     from train_test_split import get_train_val_dataloaders
     from dataloader import  collate_wrapper
     import numpy as np
 
-    # visualize_test()
+    visualize_test()
     cfg["raster_params"]["use_map"] = True
     cfg["raster_params"]["normalize"] = True
     cfg["raster_params"]["use_segm"] = False

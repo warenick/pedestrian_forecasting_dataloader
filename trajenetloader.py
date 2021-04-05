@@ -36,9 +36,9 @@ class TrajnetLoader:
         self.data_len = 0
         self.sub_data_len = [0]
         self.cfg = cfg
-        self.resize_datastes = {"SDD": 5}
+        self.resize_datastes = {"SDD": 2}
         self.border_datastes = {"SDD": 600}
-        self.img_size = {"SDD":(403, 396)}
+        self.img_size = {"SDD": (1200, 1200)}
         self.loaded_imgs = {}
         print("loading files")
         for file in tqdm(data_files):
@@ -64,28 +64,28 @@ class TrajnetLoader:
                 self.data[file] = self.data[file][:, :4]
 
                 if cfg["raster_params"]["use_map"]:
-                    img = cv2.imread(name[:name.index(".")] + ".jpg").astype(np.int16)
-                    img = cv2.resize(img, (img.shape[1] // 5, img.shape[0] // 5), interpolation=0)
+                    img = cv2.imread(name[:name.index(".")] + ".jpg").astype(np.uint8)
+                    img = cv2.resize(img, (img.shape[1] // self.resize_datastes["SDD"], img.shape[0] // self.resize_datastes["SDD"]), interpolation=0)
 
                     unified_img = np.zeros((self.img_size["SDD"][0], self.img_size["SDD"][1], 3), dtype=np.int16)
                     unified_img[:img.shape[0], :img.shape[1], :] = img
 
                     border = self.border_datastes["SDD"] // self.resize_datastes["SDD"]
                     sh = unified_img.shape
-                    img_b = np.zeros((sh[0] + 2 * border, sh[1] + 2 * border, sh[2]), dtype=np.float32)
+                    img_b = np.zeros((sh[0] + 2 * border, sh[1] + 2 * border, sh[2]), dtype=np.uint8)
                     img_b[border:-border, border:-border] = unified_img
 
                     self.loaded_imgs[name[:name.index(".")] + ".jpg"] = img_b
 
                 if cfg["raster_params"]["use_segm"]:
-                    img = np.load(name[:name.index(".")] + "_s.npy").astype(np.int16)
-                    img = cv2.resize(img, (img.shape[1] // 5, img.shape[0] // 5), interpolation=0)
-                    unified_img = np.zeros((self.img_size["SDD"][0], self.img_size["SDD"][1]), dtype=np.int16)
+                    img = np.load(name[:name.index(".")] + "_s.npy").astype(np.uint8)
+                    img = cv2.resize(img, (img.shape[1]  // self.resize_datastes["SDD"], img.shape[0]  // self.resize_datastes["SDD"]), interpolation=0)
+                    unified_img = np.zeros((self.img_size["SDD"][0], self.img_size["SDD"][1]), dtype=np.uint8)
                     unified_img[:img.shape[0], :img.shape[1]] = img
 
                     border = self.border_datastes["SDD"] // self.resize_datastes["SDD"]
                     sh = unified_img.shape
-                    img_b = np.zeros((sh[0] + 2 * border, sh[1] + 2 * border), dtype=np.float32)
+                    img_b = np.zeros((sh[0] + 2 * border, sh[1] + 2 * border), dtype=np.uint8)
                     img_b[border:-border, border:-border] = unified_img
                     self.loaded_imgs[name[:name.index(".")] + "_s.npy"] = img_b
             else:

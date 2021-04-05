@@ -13,13 +13,15 @@ try:
 except:
     from .config import SDD_scales, cropping_cfg
 import kornia
-
+import cv2
 
 def preprocess_data(data, cfg, device="cpu") -> torch.tensor:
-    imgs_tensor = (torch.tensor(data.image, device=device).permute(0, 3, 1, 2)/255.)
+    imgs_tensor = (torch.tensor(data.image, device=device, dtype=torch.float32).permute(0, 3, 1, 2))/255
+
+    mask_tensor = None
     if data.segm is not None:
-        mask_tensor = (torch.tensor(data.segm, device=device).unsqueeze(1) / 255.)
-        imgs_tensor = torch.cat((imgs_tensor, mask_tensor), dim=1)
+        mask_tensor = (torch.tensor(data.segm, device=device, dtype=torch.float32).unsqueeze(1)/255)
+        # imgs_tensor = torch.cat((imgs_tensor, mask_tensor), dim=1)
     bs = imgs_tensor.shape[0]
     cropping_points = data.cropping_points
     bboxes = torch.zeros((bs, 4, 2), device=device)
@@ -41,10 +43,12 @@ def preprocess_data(data, cfg, device="cpu") -> torch.tensor:
 
     imgs = kornia.warp_affine(imgs_tensor, transf, mode="nearest", dsize=imgs_tensor.shape[2:])
     imgs = kornia.apply_crop(imgs, params, flags)
-    mask_tensor = None
+
+
+
     if data.segm is not None:
-        mask_tensor = imgs[:, 3:4]
-        imgs = imgs[:, :3]
+        masks = kornia.warp_affine(mask_tensor, transf, mode="nearest", dsize=imgs_tensor.shape[2:])
+        mask_tensor = kornia.apply_crop(masks, params, flags)
     return imgs, mask_tensor
 
 
@@ -220,14 +224,14 @@ def calc_transform_matrix(init_coord, angle, scale, output_shape: List):
     transf = d @ c @ b @ a
     return transf
 
-import cv2
+
 def sdd_crop_and_rotate(img: np.array, path, border_width=400, draw_traj=1, pix_to_m_cfg=SDD_scales,
-                        cropping_cfg=cropping_cfg, file=None, mask=None):
+                        cropping_cfg=cropping_cfg, file=None, mask=None, scale_factor=1):
     # print(img.dtype)
     # img_pil = Image.fromarray(np.asarray(img, dtype="uint8"))
     # mask_pil = Image.fromarray(np.asarray(mask, dtype="uint8"))
     # draw = ImageDraw.Draw(img_pil)
-    scale_factor = 5
+    # scale_factor = 2
     scaled_border = border_width // scale_factor
 
     scale = pix_to_m_cfg[file]["scale"]
@@ -239,9 +243,26 @@ def sdd_crop_and_rotate(img: np.array, path, border_width=400, draw_traj=1, pix_
     if np.linalg.norm(path[1] - np.array([-1., -1.])) < 1e-6:
         angle_deg = 0
     angle_rad = angle_deg / 180 * math.pi
-    asd, map_to_local, asd = rotate_image(None, angle_deg, center=path[0] / scale_factor + scaled_border, mask=None)
+    agent_center = path[0] / scale_factor + scaled_border
+
+    ## pre crop?
+    max_dist = max(cropping_cfg["agent_center"][1] * cropping_cfg["image_area_meters"][0] / (scale * scale_factor),
+        cropping_cfg["agent_center"][0] * cropping_cfg["image_area_meters"][1] / (scale * scale_factor),
+        (1 - cropping_cfg["agent_center"][1]) * cropping_cfg["image_area_meters"][0] / (scale * scale_factor),
+        (1 - cropping_cfg["agent_center"][0]) * cropping_cfg["image_area_meters"][1] / (scale * scale_factor))
+
+    tl_x = int(round(max(0, agent_center[1] - np.sqrt(2) * max_dist)))
+    tl_y = int(round(max(0, agent_center[0] - np.sqrt(2) * max_dist)))
+    br_x = int(round(max(0, agent_center[1] + np.sqrt(2) * max_dist)))
+    br_y = int(round(max(0, agent_center[0] + np.sqrt(2) * max_dist)))
+
+    img = img[tl_x:br_x, tl_y:br_y]
+    mask = mask[tl_x:br_x, tl_y:br_y]
+
+    _, map_to_local, _ = rotate_image(None, angle_deg, center=(img.shape[0]//2, img.shape[1]//2), mask=None)
+
     crop_img, scale, crop_mask, (tl_y, tl_x, br_y, br_x) = crop_image(img, cropping_cfg,
-                                                                      agent_center=path[0] / scale_factor + scaled_border,
+                                                                      agent_center=(img.shape[0]//2, img.shape[1]//2),
                                                                       pix_to_met=scale * scale_factor,
                                                                       mask_pil=mask)
     for index in range(len(scale)):
@@ -264,7 +285,7 @@ def expand(border, img, mask):
 
 def draw_h(draw_traj, img, path, scale_factor, border):
     if draw_traj:
-        R = 1
+        R = 2
         for pose in path:
             if np.linalg.norm(pose - np.array([-1., -1.])) > 1e-6:
                 pass
@@ -327,11 +348,13 @@ def vis_image_batched_Aleksander(images, distrs, raster_from_agent, goal_avail, 
     img = []
     for i in range(bs):
         if goal_avail[i]:
-            import cv2
+
             tgt_ = transform_points(tgt[i, -1:, :], raster_from_agent[i])
             try:
-                images[i] = cv2.ellipse(images[i].astype('float32'), ((int(tgt_[0, 0]), int(tgt_[0, 1])), (6, 6), 0),
-                                        (40, 240, 50), thickness=-1)
+                # cv2.ellipse((images[i] * 255).astype(np.uint8), center=(int(tgt_[0, 0]), int(tgt_[0, 1])), axes=(6, 6),
+                #             angle=0, startAngle=0, endAngle=360, color=(40, 240, 50), thickness=-1)
+                images[i] = cv2.ellipse(images[i].astype(np.float32).copy(), ((int(tgt_[0, 0]), int(tgt_[0, 1])), (6, 6), 0),
+                                        (0.2, 0.9, 0.2), thickness=-1)
             except Exception as E:
                 print("cv2.ellipse: " + str(E))
             # cv2.ellipse(images[i], (tgt[0], tgt[1]), (3, 3), 0, 0, 360, (100, 100, 100), -1)
@@ -344,7 +367,7 @@ def vis_image_batched_Aleksander(images, distrs, raster_from_agent, goal_avail, 
 
 
 def vis_sigma_ellipses(np_im, pose_rasters, covs):
-    pil_im = Image.fromarray(np.asarray(np_im, dtype="uint8"))
+    pil_im = Image.fromarray(np.asarray(np_im*255, dtype="uint8"))
     draw = ImageDraw.Draw(pil_im)
     for pose_raster, cov in zip(pose_rasters, covs):
         # pose_raster = data.raster_from_agent[i].numpy() @ np.array([predictions[i, 0], predictions[i, 1], 1.])

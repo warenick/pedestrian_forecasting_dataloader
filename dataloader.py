@@ -23,8 +23,9 @@ except:
 
 import math
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 import os
-
+idk = 0
 
 torch.multiprocessing.set_sharing_strategy('file_system')
 
@@ -45,7 +46,7 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         return self.loader.data_len
 
     def __getitem__(self, index: int):
-        # print(os.getpid(), 1)
+        # print(os.getpid(), 1, time.time())
         dataset_index = self.loader.get_subdataset_ts_separator(index)
         file = self.files[dataset_index]
         ped_id, ts = self.loader.get_pedId_and_timestamp_by_index(dataset_index, index)
@@ -382,10 +383,10 @@ class DatasetFromTxt(torch.utils.data.Dataset):
 
         if ("stanford" in file) or ("SDD" in file):
             if self.cfg["raster_params"]["normalize"]:
-                # print(os.getpid(), 2)
+                # print(os.getpid(), 2, time.time())
                 res = self.crop_and_normilize(agent_future, agent_hist_avail, agent_history, file, hist_avail, img,
                                               target_avil, time_sorted_hist, forces, mask)
-                # print(os.getpid(), 3)
+                # print(os.getpid(), 3, time.time())
 
             else:
 
@@ -454,6 +455,7 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         neigh_localM = np.concatenate((neigh_localM, neigh_speed, neigh_acc), axis=2)
         return agent_history, neigh_localM
 
+
     def crop_and_normilize(self, agent_future, agent_hist_avail, agent_history, file, hist_avail, img, target_avil,
                            time_sorted_hist, forces, mask):
 
@@ -470,13 +472,37 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         if img is None:
             pass
         else:
-            img, globPix_to_locraster, scale, mask, map_to_local, (tl_y, tl_x, br_y, br_x) = sdd_crop_and_rotate(img, agent_history[:, 2:],
+            img, globPix_to_locraster, scale,\
+            mask, map_to_local,\
+            (tl_y, tl_x, br_y, br_x) = sdd_crop_and_rotate(img, agent_history[:, 2:],
                                                                    border_width=600,
                                                                    draw_traj=1,
                                                                    pix_to_m_cfg=self.cfg['SDD_scales'],
                                                                    cropping_cfg=self.cfg['cropping_cfg'], file=file,
-                                                                   mask=mask)
+                                                                   mask=mask,
+                                                                   scale_factor=self.loader.resize_datastes["SDD"])
 
+        new_im = np.zeros((700, 700, 3), dtype=np.uint8)
+        new_mask = np.zeros((700, 700), dtype=np.uint8)
+        new_im[:img.shape[0], :img.shape[1]] = np.copy(img)
+
+        new_mask[:img.shape[0], :img.shape[1]] = np.copy(mask)
+
+        global idk
+
+        # img = cv2.warpAffine(img, map_to_local[:2, :], (img.shape[1], img.shape[0]))
+        # img = img[int(tl_x):int(br_x), int(tl_y):int(br_y)]
+        # img = cv2.resize(img, (336,336))
+        # mask = cv2.warpAffine(mask, map_to_local[:2, :], (img.shape[1], img.shape[0]))
+        # mask = mask[int(tl_x):int(br_x), int(tl_y):int(br_y)]
+        # mask = cv2.resize(mask, (336, 336))
+        # dst = cv2.warpAffine(img, map_to_local[:2, :], (img.shape[1], img.shape[0]))
+        # plt.imshow(dst[int(tl_x):int(br_x), int(tl_y):int(br_y)])
+        # plt.savefig(str(idk)+".jpg")
+        # idk+=1
+
+        img = new_im
+        mask = new_mask
         pix_to_m = np.eye(3) * self.cfg['SDD_scales'][file]["scale"]
         pix_to_m[:2, :2] = pix_to_m[:2, :2] @ np.array(
             [[1 / scale[0], 0], [0, 1 / scale[1]]])  # np.linalg.inv(globPix_to_locraster[:2, :2])
@@ -516,12 +542,14 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         agent_hist_localM = transform_points(local_hist_pix, agent_from_raster)
         neigh_localM = transform_points(local_neigh_pix, agent_from_raster)
         target_localM = transform_points(local_target_pix, agent_from_raster)
+        # if np.linalg.norm(target_localM[-1, :]) * target_avil[-1] > 20:
+        #     print(target_localM[-1, :])
         world_from_agent = globPix_to_locraster @ raster_from_agent
         agent_from_world = pix_to_m @ globPix_to_locraster
         raster_from_world = raster_from_agent @ agent_from_world
         agent_hist_localM, neigh_localM = self.calc_speed_accel(agent_hist_localM, neigh_localM, agent_hist_avail,
                                                                 hist_avail)
-        res = [img, mask, agent_hist_localM, agent_hist_avail,target_localM, target_avil, neigh_localM,
+        res = [img.astype(np.uint8), mask.astype(np.uint8), agent_hist_localM, agent_hist_avail,target_localM, target_avil, neigh_localM,
                hist_avail, np.linalg.inv(agent_from_raster), raster_from_world, world_from_agent, agent_from_world,
                np.linalg.inv(globPix_to_locraster), transform_points(forces, rotation_matrix), map_to_local,
                np.array([tl_y, tl_x, br_y, br_x])]
@@ -626,6 +654,7 @@ import time
 # #
 class UnifiedInterface:
     def __init__(self, data):
+        # return None
         st = time.time()
         if data[0][0] is None:
             self.image = None
@@ -701,7 +730,7 @@ class UnifiedInterface:
         self.extent = None
         self.yaw = None
         self.speed = None
-
+        # print(time.time() - st)
 
 def collate_wrapper(batch):
     return UnifiedInterface(batch)
