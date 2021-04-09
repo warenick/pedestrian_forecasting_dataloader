@@ -30,6 +30,12 @@ def find_min_time(t1, t2):
 
     return min_d
 
+def find_min_dist2(traj1,traj2):
+
+    dists = np.linalg.norm(traj1-traj2)
+    min_d = dists.min()
+    return min_d
+
 def find_min_dist(p1x, p1y, p2x, p2y):
     '''given two time frame arrays, find then min dist'''
     min_d = 9e4
@@ -52,6 +58,7 @@ def social_and_temporal_filter(p1_key, p2_key, all_data_dict, time_thresh=48, di
     if find_min_time(p1_time, p2_time)>time_thresh:
         return False
     if find_min_dist(p1_x, p1_y, p2_x, p2_y)>dist_tresh:
+    # if find_min_dist2(p1_x, p1_y, p2_x, p2_y)>dist_tresh:
         return False
 
     return True
@@ -153,6 +160,7 @@ def generate_pooled_data(b_size, t_tresh, d_tresh, train=True, scene=None, verbo
         train_name = "data/social_pool_data/train_{0}_{1}_{2}_{3}.pickle".format('all' if scene is None else scene[:-2] + scene[-1], b_size, t_tresh, d_tresh)
         with open(train_name, 'wb') as f:
             pickle.dump([full_train, full_masks_train], f)
+        return full_train, full_masks_train
 
     if not train:
         full_test, full_masks_test = collect_data(
@@ -167,6 +175,7 @@ def generate_pooled_data(b_size, t_tresh, d_tresh, train=True, scene=None, verbo
         test_name = "data/social_pool_data/test_{0}_{1}_{2}_{3}.pickle".format('all' if scene is None else scene[:-2] + scene[-1], b_size, t_tresh, d_tresh)# + str(b_size) + "_" + str(t_tresh) + "_" + str(d_tresh) + ".pickle"
         with open(test_name, 'wb') as f:
             pickle.dump([full_test, full_masks_test], f)
+        return full_test, full_masks_test
 
 
 
@@ -186,8 +195,8 @@ def generate_pooled_data(b_size, t_tresh, d_tresh, train=True, scene=None, verbo
 
 if __name__=="__main__":
     # generate_pooled_data(512,0,25, train=True, verbose=True, root_path="./")
-    generate_pooled_data( 
-        b_size=512,
+    traj, mask = generate_pooled_data( 
+        b_size=10,
         t_tresh=0,
         d_tresh=25, 
         train=True, 
@@ -195,6 +204,9 @@ if __name__=="__main__":
         # scene = 'biwi_eth/biwi_eth__'
         scene = "stanford/bookstore_0"
         )
+
+    print(traj[0],mask[0])
+    exit()
 
 
 
