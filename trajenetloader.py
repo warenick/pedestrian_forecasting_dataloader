@@ -36,9 +36,9 @@ class TrajnetLoader:
         self.data_len = 0
         self.sub_data_len = [0]
         self.cfg = cfg
-        self.resize_datastes = {"SDD": 2}
-        self.border_datastes = {"SDD": 600}
-        self.img_size = {"SDD": (1200, 1200)}
+        self.resize_datastes = {"SDD": 3}
+        self.border_datastes = {"SDD": 800}
+        self.img_size = {"SDD": (int(2100/self.resize_datastes["SDD"]), int(2000/self.resize_datastes["SDD"]))}
         self.loaded_imgs = {}
         print("loading files")
         for file in tqdm(data_files):
@@ -79,7 +79,7 @@ class TrajnetLoader:
 
                 if cfg["raster_params"]["use_segm"]:
                     img = np.load(name[:name.index(".")] + "_s.npy").astype(np.uint8)
-                    img = cv2.resize(img, (img.shape[1]  // self.resize_datastes["SDD"], img.shape[0]  // self.resize_datastes["SDD"]), interpolation=0)
+                    img = cv2.resize(img, (img.shape[1] // self.resize_datastes["SDD"], img.shape[0]  // self.resize_datastes["SDD"]), interpolation=0)
                     unified_img = np.zeros((self.img_size["SDD"][0], self.img_size["SDD"][1]), dtype=np.uint8)
                     unified_img[:img.shape[0], :img.shape[1]] = img
 

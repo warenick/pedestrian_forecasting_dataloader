@@ -33,7 +33,7 @@ def visualize_test():
 
         data[0] = cv2.warpAffine(data[0], data[14][:2, :], (data[0].shape[1], data[0].shape[0]))
         data[0] = data[0][int(data[15][1]):int(data[15][3]), int(data[15][0]):int(data[15][2])]
-        data[0] = cv2.resize(data[0], (336, 336))
+        data[0] = cv2.resize(data[0], (112, 112))
         img = Image.fromarray(np.asarray(data[0], dtype="uint8"))
         draw = ImageDraw.Draw(img)
         if data[3][1] == 0:
@@ -79,8 +79,10 @@ def visualize_test():
                     draw.ellipse(
                         (pose_raster[0] - Rad, pose_raster[1] - Rad, pose_raster[0] + Rad, pose_raster[1] + Rad),
                         fill='#33cc33', outline='#33cc33')
-        img.save(str(i)+".jpg")
-        print()
+        img.save("test/"+str(i)+".jpg")
+        # pix_path = torch.einsum("bki, bji-> bjk", torch.tensor(data.loc_im_to_glob @ data.raster_from_agent).float(),
+        #                         path_.float())
+        # print()
 if __name__ == "__main__":
     from train_test_split import get_train_val_dataloaders
     from dataloader import  collate_wrapper

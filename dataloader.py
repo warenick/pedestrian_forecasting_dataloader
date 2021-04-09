@@ -26,8 +26,10 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 import os
 idk = 0
-
+max_size_x = 0
+max_size_y = 0
 torch.multiprocessing.set_sharing_strategy('file_system')
+
 
 
 class DatasetFromTxt(torch.utils.data.Dataset):
@@ -148,25 +150,7 @@ class DatasetFromTxt(torch.utils.data.Dataset):
                     "file": file[file.index("/") + 1:]
                     }
 
-            # if not self.cfg["raster_params"]["normalize"]:
-            #     agent_history, neigh_localM = self.calc_speed_accel(agent_history[:, self.loader.coors_row], time_sorted_hist)
-            #     return {"img": None,
-            #             "agent_hist": agent_history,
-            #             "agent_hist_avail": agent_hist_avail,
-            #             "target": agent_future[:, self.loader.coors_row],
-            #             "target_avil": target_avil,
-            #             "neighb": time_sorted_hist,
-            #             "neighb_avail": hist_avail,
-            #             "glob_to_local": None,
-            #             "image_to_local": None,
-            #             "forces": forces,
-            #             "raster_from_agent": np.eye(3),
-            #             "raster_from_world": np.eye(3),  # raster_from_world,
-            #             "world_from_agent": np.eye(3),  # world_from_agent,
-            #             "agent_from_world": np.eye(3),  # agent_from_world
-            #             "loc_im_to_glob": np.eye(3),
-            #             "file": file[file.index("/") + 1:]
-            #             }
+
 
         # if map:
         if "UCY" in file or "eth" in file:
@@ -384,8 +368,13 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         if ("stanford" in file) or ("SDD" in file):
             if self.cfg["raster_params"]["normalize"]:
                 # print(os.getpid(), 2, time.time())
+                # self.border_datastes["SDD"] // self.resize_datastes["SDD"]
+                # agent_future[:, 2:] += self.loader.border_datastes["SDD"] // self.loader.resize_datastes["SDD"]
+                # agent_history[:, 2:] += self.loader.border_datastes["SDD"] // self.loader.resize_datastes["SDD"]
+                # time_sorted_hist[:, :, 2:] += self.loader.border_datastes["SDD"] // self.loader.resize_datastes["SDD"]
+                # time_sorted_future[:, :, 2:] += self.loader.border_datastes["SDD"] // self.loader.resize_datastes["SDD"]
                 res = self.crop_and_normilize(agent_future, agent_hist_avail, agent_history, file, hist_avail, img,
-                                              target_avil, time_sorted_hist, forces, mask)
+                                              target_avil, time_sorted_hist, forces, mask, border_width=self.loader.border_datastes["SDD"])
                 # print(os.getpid(), 3, time.time())
 
             else:
@@ -457,7 +446,7 @@ class DatasetFromTxt(torch.utils.data.Dataset):
 
 
     def crop_and_normilize(self, agent_future, agent_hist_avail, agent_history, file, hist_avail, img, target_avil,
-                           time_sorted_hist, forces, mask):
+                           time_sorted_hist, forces, mask, border_width):
 
         # rotate in a such way that last hisory points are horizontal (elft to right),
         # crop to spec in cfg area and resize
@@ -475,20 +464,30 @@ class DatasetFromTxt(torch.utils.data.Dataset):
             img, globPix_to_locraster, scale,\
             mask, map_to_local,\
             (tl_y, tl_x, br_y, br_x) = sdd_crop_and_rotate(img, agent_history[:, 2:],
-                                                                   border_width=600,
+                                                                   border_width=border_width,
                                                                    draw_traj=1,
                                                                    pix_to_m_cfg=self.cfg['SDD_scales'],
                                                                    cropping_cfg=self.cfg['cropping_cfg'], file=file,
                                                                    mask=mask,
                                                                    scale_factor=self.loader.resize_datastes["SDD"])
 
-        new_im = np.zeros((700, 700, 3), dtype=np.uint8)
-        new_mask = np.zeros((700, 700), dtype=np.uint8)
-        new_im[:img.shape[0], :img.shape[1]] = np.copy(img)
+        import cv2
+        img_size = (int(0.6*self.loader.img_size["SDD"][0]), int(0.6*self.loader.img_size["SDD"][1])) #self.loader.resize_datastes["SDD"]*100
+        # print(img_size)
+        # print(img.shape)
+        # global max_size_x, max_size_y
+        # max_size_x = max(max_size_x, img.shape[0])
+        # print(max_size_x, max_size_y)
+        # max_size_y = max(max_size_y, img.shape[1])
+        # print(max_size_x, max_size_y)
 
+        new_im = np.zeros((img_size[0], img_size[1], 3), dtype=np.uint8)
+        new_mask = np.zeros((img_size[0], img_size[1]), dtype=np.uint8)
+        new_im[:img.shape[0], :img.shape[1]] = np.copy(img)
+        #
         new_mask[:img.shape[0], :img.shape[1]] = np.copy(mask)
 
-        global idk
+        # global idk
 
         # img = cv2.warpAffine(img, map_to_local[:2, :], (img.shape[1], img.shape[0]))
         # img = img[int(tl_x):int(br_x), int(tl_y):int(br_y)]
@@ -922,8 +921,9 @@ if __name__ == "__main__":
     cfg["raster_params"]["use_map"] = True
     cfg["raster_params"]["normalize"] = True
     cfg["raster_params"]["use_segm"] = True
+
     files = [  # "biwi_eth/biwi_eth.txt",
-        "SDD/bookstore_0.txt",
+        "SDD/bookstore_0.txt", "SDD/coupa_1.txt", "SDD/deathCircle_4.txt", "SDD/gates_1.txt"
         # "crowds/students001.txt",        "crowds/students003.txt",
         # "stanford/bookstore_0.txt", "stanford/bookstore_1.txt",
         # "stanford/bookstore_2.txt", "stanford/bookstore_3.txt",
@@ -935,17 +935,27 @@ if __name__ == "__main__":
 
     dataset = DatasetFromTxt(path_, files, cfg)
     dataloader = DataLoader(dataset, batch_size=32,
-                            shuffle=False, num_workers=0, collate_fn=collate_wrapper)
+                            shuffle=True, num_workers=0, collate_fn=collate_wrapper)
 
-    threshold = 400
-    speeds_zara = np.zeros(0)
+    threshold = 200
+    speeds_sdd = np.zeros(0)
     for i, data in enumerate((dataloader)):
         speed = np.linalg.norm(data.history_positions[:, :, 2:4], axis=2)[data.history_av == 1].reshape(-1)
-        speeds_zara = np.concatenate((speeds_zara, speed[speed>1e-6]))
+        speeds_sdd = np.concatenate((speeds_sdd, speed[speed > 1e-6]))
         if i > threshold:
-            print("crowds speed average:", np.mean(speeds_zara))
+            print("crowds speed average:", np.mean(speeds_sdd))
             break
+    n_bins = 500
+    plt.hist(speeds_sdd, n_bins, alpha=0.5, label='speeds_sdd')
+    # plt.hist(speeds_biwi_eth, n_bins, alpha=0.5, label='speeds_biwi_eth')
+    # plt.hist(speeds_stanford, n_bins, alpha=0.5, label='speeds_stanford')
+    # plt.hist(speeds_students, n_bins, alpha=0.5, label='speeds_students')
+    # plt.hist(speeds_eth_hot, n_bins, alpha=0.5, label='speeds_eth_hot')
 
+    plt.legend(loc='upper right')
+    plt.savefig('sdd.png')
+    plt.show()
+    exit()
     cfg["raster_params"]["use_map"] = False
     cfg["raster_params"]["normalize"] = False
     files = [
