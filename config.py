@@ -339,6 +339,8 @@ cropping_cfg = {
 cfg = {
     "data_path": "../data/train/",
     "files": ["biwi/biwi_hotel.txt", "mot/PETS09-S2L1.txt"],
+    "uniq_traj_for_agents": False,
+    "use_only_pedestrian": False,
     'raster_params': {
         "draw_hist": True,
         "use_map": False,

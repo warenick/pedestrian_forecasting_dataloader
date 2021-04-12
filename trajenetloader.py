@@ -33,7 +33,10 @@ class TrajnetLoader:
 
         self.data = {}
         self.data_len = 0
+        self.uniq_ids = {}
+        self.uniq_ids_len = 0
         self.sub_data_len = [0]
+        self.sub_data_len_ids = [0]
         self.cfg = cfg
         print("loading files")
         for file in tqdm(data_files):
@@ -52,6 +55,15 @@ class TrajnetLoader:
                 self.data[file][:, 2] = (self.data[file][:, 2] + self.data[file][:, 4]) / 2
                 self.data[file][:, 3] = (self.data[file][:, 3] + self.data[file][:, 5]) / 2
                 self.data[file] = self.data[file][:, :4]
+                if self.cfg["uniq_traj_for_agents"]:
+                    ids, indexes, counts = np.unique(self.data[file][:,1],return_index = True,return_counts = True)
+                    ids = ids[counts>=20]
+                    indexes = indexes[counts>=20]
+                    tss = (self.data[file][:,0])[indexes]
+                    tss = tss + 12 * 7 # calc time at 8 step of trajectory
+                    self.uniq_ids[file] = np.array([ids,tss])    #np.unique(np.concatenate([self.data[file][:,0][None],self.data[file][:,1][None]]),)#
+                    self.uniq_ids_len+=len(ids)
+                    self.sub_data_len_ids.append(self.uniq_ids_len)
             else:
                 self.data[file] = np.genfromtxt(path + "/" + file, delimiter='')
             self.data_len += len(self.data[file])
@@ -133,7 +145,10 @@ class TrajnetLoader:
             :param index: index of data (row) in whole(combined) dataset
             :return: index of dataset file
         """
-        dataset_ind, = np.where(np.array(self.sub_data_len) <= index)
+        if self.cfg["uniq_traj_for_agents"]:
+            dataset_ind, = np.where(np.array(self.sub_data_len_ids) <= index)
+        else:
+            dataset_ind, = np.where(np.array(self.sub_data_len) <= index)
         #         print(dataset_ind)
         return dataset_ind[-1]
 
@@ -152,6 +167,26 @@ class TrajnetLoader:
         ts = data[index, self.ts_row]
         ped_id = data[index, self.index_row]
         return ped_id, ts
+
+    def get_uniq_pedId_and_timestamp_by_index(self, dataset_ind: int, index: int) -> (int, int):
+        """
+        :param dataset_ind: index of dataset file (from get_subdataset_ts_separator)
+        :param index: index of data (agent id) in whole(combined) dataset
+        :return:
+            ped_id:  pedestrinan id
+            ts: timestamp
+
+        """
+        file = self.data_files[dataset_ind]
+        # data = self.data[file]
+        index = index - self.sub_data_len_ids[dataset_ind]
+        ped_id = self.uniq_ids[file][0,index]
+        ts = self.uniq_ids[file][1,index]
+
+        # ts = data[index, self.ts_row]
+        # ped_id = data[index, self.index_row]
+        return ped_id, ts
+
 
     def get_map(self, dataset_ind: int, ped_id: int, timestamp: float):
         import cv2

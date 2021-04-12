@@ -42,16 +42,22 @@ class DatasetFromTxt(torch.utils.data.Dataset):
             self.force_from_txt = Force_from_txt(forces_file)
 
     def __len__(self):
+        if self.cfg["uniq_traj_for_agents"]:
+            return self.loader.uniq_ids_len
         return self.loader.data_len
 
     def __getitem__(self, index: int):
         dataset_index = self.loader.get_subdataset_ts_separator(index)
         file = self.files[dataset_index]
-        ped_id, ts = self.loader.get_pedId_and_timestamp_by_index(dataset_index, index)
+        if self.cfg["uniq_traj_for_agents"]:
+            ped_id, ts = self.loader.get_uniq_pedId_and_timestamp_by_index(dataset_index, index)
+        else:
+            ped_id, ts = self.loader.get_pedId_and_timestamp_by_index(dataset_index, index)
         agent_history = self.loader.get_agent_history(dataset_index, ped_id, ts)
         agent_future = self.loader.get_agent_future(dataset_index, ped_id, ts)
         indexes = self.loader.get_all_agents_with_timestamp(dataset_index, ts)
         indexes = indexes[indexes != ped_id]
+        # there 
         others_history = []
         others_future = []
         forces = np.zeros(6)
@@ -562,7 +568,42 @@ def collate_wrapper(batch):
 
 if __name__ == "__main__":
     pass
-    path_ = "/media/robot/hdd1/hdd_repos/pedestrian_forecasting_dataloader/data/train/"
+ 
+    path_ = "data/train/"
+
+    cfg["raster_params"]["use_map"] = False
+    cfg["raster_params"]["normalize"] = True
+    files = [
+        # "UCY/zara01/zara01.txt",
+        # "crowds/students001.txt",        "crowds/students003.txt",
+        "SDD/bookstore_0.txt", "SDD/bookstore_1.txt",
+        # "stanford/bookstore_2.txt", "stanford/bookstore_3.txt",
+        # "stanford/coupa_3.txt",
+        # "stanford/deathCircle_0.txt",
+    ]
+    import matplotlib.pyplot as plt
+    # fig, axs = plt.subplots(2, 2, tight_layout=True)
+    cfg["uniq_traj_for_agents"] = False
+    cfg["use_only_pedestrian"] = False
+    dataset = DatasetFromTxt(path_, files, cfg)
+    dataloader = DataLoader(dataset, batch_size=128,
+                            shuffle=False, num_workers=0, collate_fn=collate_wrapper)
+
+    print(len(dataset))
+
+    threshold = 400
+
+    speeds_zara = np.zeros(0)
+    for i, data in enumerate((dataloader)):
+        speed = np.linalg.norm(data.history_positions[:, :, 2:4], axis=2)[data.history_av == 1].reshape(-1)
+        speeds_zara = np.concatenate((speeds_zara, speed[speed>1e-6]))
+        if i > threshold:
+            print("crowds speed average:", np.mean(speeds_zara))
+            break
+    # exit()
+
+    # path_ = "/media/robot/hdd1/hdd_repos/pedestrian_forecasting_dataloader/data/train/"
+    cfg["uniq_traj_for_agents"] = False
 
     cfg["raster_params"]["use_map"] = False
     cfg["raster_params"]["normalize"] = True
