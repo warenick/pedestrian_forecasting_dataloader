@@ -46,11 +46,16 @@ class TrajnetLoader:
                     name = path + "/" + file
                     new_name = name[:name.index(".")] + ".npy"
                     self.data[file] = np.load(new_name)
-                except:
+                except:    
                     self.data[file] = np.loadtxt(path + "/" + file, delimiter=' ', usecols=[0, 1, 2, 3, 4, 5])
-
+                    if self.cfg["use_only_pedestrian"]:
+                        types = np.genfromtxt(path + "/" + file ,usecols=[9],dtype='str')
+                        only_peds = (types == "\"Pedestrian\"")
+                        self.data[file] = self.data[file][only_peds]
+                       
                 self.data[file] = self.data[file][
                     (self.data[file][:, 5] + (self.data[file][:, 5].min() % 12)) % 12 == 0]
+                
                 self.data[file] = self.data[file][:, (5, 0, 1, 2, 3, 4)]
                 self.data[file][:, 2] = (self.data[file][:, 2] + self.data[file][:, 4]) / 2
                 self.data[file][:, 3] = (self.data[file][:, 3] + self.data[file][:, 5]) / 2

@@ -576,22 +576,28 @@ if __name__ == "__main__":
     files = [
         # "UCY/zara01/zara01.txt",
         # "crowds/students001.txt",        "crowds/students003.txt",
-        "SDD/bookstore_0.txt", "SDD/bookstore_1.txt",
+        # "SDD/",
+        # "SDD/bookstore_0.txt", "SDD/bookstore_1.txt",
         # "stanford/bookstore_2.txt", "stanford/bookstore_3.txt",
         # "stanford/coupa_3.txt",
         # "stanford/deathCircle_0.txt",
     ]
+    from pathlib import Path
+    pathes = list(Path(path_+"SDD").rglob("*.[tT][xX][tT]"))
+    files = [str(x).replace(path_,"") for x in pathes]
+
     import matplotlib.pyplot as plt
     # fig, axs = plt.subplots(2, 2, tight_layout=True)
-    cfg["uniq_traj_for_agents"] = False
-    cfg["use_only_pedestrian"] = False
+    cfg["uniq_traj_for_agents"] = True
+    cfg["use_only_pedestrian"] = True
     dataset = DatasetFromTxt(path_, files, cfg)
     dataloader = DataLoader(dataset, batch_size=128,
                             shuffle=False, num_workers=0, collate_fn=collate_wrapper)
 
-    print(len(dataset))
+    print(len(dataset)) # all 55975, uniq 557, peds all 37284, peds uniq 283 
+    # uniq only peds 5102
 
-    threshold = 400
+    threshold = 30
 
     speeds_zara = np.zeros(0)
     for i, data in enumerate((dataloader)):
@@ -600,11 +606,12 @@ if __name__ == "__main__":
         if i > threshold:
             print("crowds speed average:", np.mean(speeds_zara))
             break
-    # exit()
+    exit()
 
     # path_ = "/media/robot/hdd1/hdd_repos/pedestrian_forecasting_dataloader/data/train/"
     cfg["uniq_traj_for_agents"] = False
-
+    cfg["use_only_pedestrian"] = False
+ 
     cfg["raster_params"]["use_map"] = False
     cfg["raster_params"]["normalize"] = True
     files = [
