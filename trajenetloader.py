@@ -2,6 +2,9 @@ import numpy as np
 from tqdm import tqdm
 import cv2
 import matplotlib.pyplot as plt
+from transformations import Resize, AddBorder
+
+
 
 class TrajnetLoader:
 
@@ -36,18 +39,23 @@ class TrajnetLoader:
         self.data_len = 0
         self.sub_data_len = [0]
         self.cfg = cfg
-        self.resize_datastes = {"SDD": 3}
-        self.border_datastes = {"SDD": 800}
-        self.img_size = {"SDD": (int(2100/self.resize_datastes["SDD"]), int(2000/self.resize_datastes["SDD"]))}
+        self.resize_datastes = {"SDD": 3, "ETH/UCY": 1}
+        self.border_datastes = {"SDD": 800, "ETH/UCY": 300}
+        self.img_size = {"SDD": (int(2100/self.resize_datastes["SDD"]), int(2000/self.resize_datastes["SDD"])),
+                         "ETH/UCY": (int(2100 / self.resize_datastes["ETH/UCY"]), int(2000 / self.resize_datastes["ETH/UCY"]))}
         self.loaded_imgs = {}
+        self.img_transf = {}
         print("loading files")
-        for file in tqdm(data_files):
 
+        for file in tqdm(data_files):
+            dataset = "ETH/UCY"
+            if path[-1] != "/":
+                path += "/"
+            name = path + file
             if "SDD" in file:
+                dataset = "SDD"
                 try:
-                    if path[-1] != "/":
-                        path+="/"
-                    name = path + file
+
                     new_name = name[:name.index(".")] + ".npy"
                     self.data[file] = np.load(new_name).astype(np.float32)
 
@@ -62,34 +70,44 @@ class TrajnetLoader:
 
 
                 self.data[file] = self.data[file][:, :4]
-
-                if cfg["raster_params"]["use_map"]:
-                    img = cv2.imread(name[:name.index(".")] + ".jpg").astype(np.uint8)
-                    img = cv2.resize(img, (img.shape[1] // self.resize_datastes["SDD"], img.shape[0] // self.resize_datastes["SDD"]), interpolation=0)
-
-                    unified_img = np.zeros((self.img_size["SDD"][0], self.img_size["SDD"][1], 3), dtype=np.int16)
-                    unified_img[:img.shape[0], :img.shape[1], :] = img
-
-                    border = self.border_datastes["SDD"] // self.resize_datastes["SDD"]
-                    sh = unified_img.shape
-                    img_b = np.zeros((sh[0] + 2 * border, sh[1] + 2 * border, sh[2]), dtype=np.uint8)
-                    img_b[border:-border, border:-border] = unified_img
-
-                    self.loaded_imgs[name[:name.index(".")] + ".jpg"] = img_b
-
-                if cfg["raster_params"]["use_segm"]:
-                    img = np.load(name[:name.index(".")] + "_s.npy").astype(np.uint8)
-                    img = cv2.resize(img, (img.shape[1] // self.resize_datastes["SDD"], img.shape[0]  // self.resize_datastes["SDD"]), interpolation=0)
-                    unified_img = np.zeros((self.img_size["SDD"][0], self.img_size["SDD"][1]), dtype=np.uint8)
-                    unified_img[:img.shape[0], :img.shape[1]] = img
-
-                    border = self.border_datastes["SDD"] // self.resize_datastes["SDD"]
-                    sh = unified_img.shape
-                    img_b = np.zeros((sh[0] + 2 * border, sh[1] + 2 * border), dtype=np.uint8)
-                    img_b[border:-border, border:-border] = unified_img
-                    self.loaded_imgs[name[:name.index(".")] + "_s.npy"] = img_b
             else:
                 self.data[file] = np.genfromtxt(path + "/" + file, delimiter='').astype(np.float32)
+            if cfg["raster_params"]["use_map"]:
+                img_format = ".png"
+                if dataset == "SDD":
+                    img_format = ".jpg"
+                img = cv2.imread(name[:name.index(".")] + img_format).astype(np.uint8)
+                mask = np.ones_like(img)[:, :, 0]
+                if cfg["raster_params"]["use_segm"]:
+                    mask = np.load(name[:name.index(".")] + "_s.npy").astype(np.uint8)
+
+                # initial resize of image (for speed-up)
+                transf = np.eye(3)
+                resize_transf = Resize((1/self.resize_datastes[dataset], 1/self.resize_datastes[dataset]))
+                img = resize_transf.apply(img)
+                mask = resize_transf.apply(mask)
+                transf = resize_transf.transformation_matrix @ transf
+
+                # in order to keep all images at the same "buffer" need to use unified img size
+                unified_img = np.zeros((self.img_size[dataset][0], self.img_size[dataset][1], 3), dtype=np.int16)
+                unified_img[:img.shape[0], :img.shape[1], :] = img
+                unified_mask = np.zeros((self.img_size[dataset][0], self.img_size[dataset][1], 1), dtype=np.int16)
+                unified_mask[:mask.shape[0], :mask.shape[1], 0] = mask
+                img = unified_img
+                mask = unified_mask
+
+                #
+                border = self.border_datastes[dataset] // self.resize_datastes[dataset]
+                transf_border = AddBorder(border)
+                img = transf_border.apply(img)
+                mask = transf_border.apply(mask)
+                transf = transf_border.transformation_matrix @ transf
+
+
+                self.loaded_imgs[name[:name.index(".")] + img_format] = img
+                self.img_transf[name[:name.index(".")] + img_format] = transf
+                self.loaded_imgs[name[:name.index(".")] + "_s.npy"] = mask
+
             self.data_len += len(self.data[file])
             self.sub_data_len.append(self.data_len)
 
@@ -273,8 +291,8 @@ class TrajnetLoader:
             # img = Image.open(img_file)
             # img = np.asarray(img, dtype="int32")
         if self.cfg["raster_params"]["use_segm"]:
-            return np.copy(self.loaded_imgs[img_file]), np.copy(self.loaded_imgs[segm_file])
+            return np.copy(self.loaded_imgs[img_file]), np.copy(self.loaded_imgs[segm_file]), self.img_transf[img_file]
         else:
-            return np.copy(self.loaded_imgs[img_file]), None
+            return np.copy(self.loaded_imgs[img_file]), None, self.img_transf[img_file]
 
 

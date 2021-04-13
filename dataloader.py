@@ -85,7 +85,7 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         target_avil = (agent_future[:, 0] != -1).astype(int)
         hist_avail = (time_sorted_hist[:, :, 0] != -1).astype(int)
         neighb_future_avail = (time_sorted_future[:, :, 0] != -1).astype(int)
-        img, mask = self.loader.get_map(dataset_index, ped_id, ts)
+        img, mask, transform = self.loader.get_map(dataset_index, ped_id, ts)
         # img = np.ones((600,600,3), dtype=np.float32)
         # mask = np.ones((600,600) , dtype=np.float32)
         if not self.cfg["raster_params"]["use_map"]:
@@ -150,8 +150,6 @@ class DatasetFromTxt(torch.utils.data.Dataset):
                     "file": file[file.index("/") + 1:]
                     }
 
-
-
         # if map:
         if "UCY" in file or "eth" in file:
             pix_to_image = {}
@@ -170,7 +168,7 @@ class DatasetFromTxt(torch.utils.data.Dataset):
                     pix_to_image = self.cfg["zara3_pix_to_image_cfg"]
                     img_pil = img_pil.resize([int(img_pil.size[0] * 0.8), int(img_pil.size[1] * 0.8)])
                     if mask is not None:
-                        mask_pil = mask_pil.resize([int(img_pil.size[0] * 0.8), int(img_pil.size[1] * 0.8)],0)
+                        mask_pil = mask_pil.resize([int(img_pil.size[0] * 0.8), int(img_pil.size[1] * 0.8)], 0)
                 pix_to_m = self.cfg["zara_h"]
 
                 if not "zara03" in file:
