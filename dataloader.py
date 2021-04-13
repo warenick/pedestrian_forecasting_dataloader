@@ -249,7 +249,7 @@ class DatasetFromTxt(torch.utils.data.Dataset):
 
                     for number, pose in enumerate(agent_history[:, 2:]):
                         if agent_hist_avail[number]:
-                            rgb = (0,0,255//(number+1))
+                            rgb = (0, 0, 255//(number+1))
                             draw.ellipse((pix_to_image["coef_x"] * pose[0] - R + pix_to_image["displ_x"]+border_width,
                                           pix_to_image["coef_y"] * pose[1] - R + pix_to_image["displ_y"]+border_width,
                                           pix_to_image["coef_x"] * pose[0] + R + pix_to_image["displ_x"]+border_width,

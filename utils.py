@@ -189,6 +189,7 @@ def crop_image(img, cfg, agent_center: np.array, pix_to_met, mask_pil):
     tl_y = max(0, agent_center[0] - cfg["agent_center"][0] * cfg["image_area_meters"][1] / pix_to_met)
     br_x = max(0, agent_center[1] + (1 - cfg["agent_center"][1]) * cfg["image_area_meters"][0] / pix_to_met)
     br_y = max(0, agent_center[0] + (1 - cfg["agent_center"][0]) * cfg["image_area_meters"][1] / pix_to_met)
+    assert tl_x * tl_y * br_y * br_x != 0
     image_resize_coef = [cfg["image_shape"][0] / abs(tl_y - br_y), cfg["image_shape"][1] / abs(tl_y - br_y)]
     # cropped = img.crop((tl_y, tl_x, br_y, br_x))
     # mask_pil_cropped = mask_pil.crop((tl_y, tl_x, br_y, br_x))
@@ -251,10 +252,12 @@ def sdd_crop_and_rotate(img: np.array, path, border_width=400, draw_traj=1, pix_
         (1 - cropping_cfg["agent_center"][1]) * cropping_cfg["image_area_meters"][0] / (scale * scale_factor),
         (1 - cropping_cfg["agent_center"][0]) * cropping_cfg["image_area_meters"][1] / (scale * scale_factor))
 
-    tl_x = int(round(max(0, agent_center[1] - np.sqrt(2) * max_dist)))
-    tl_y = int(round(max(0, agent_center[0] - np.sqrt(2) * max_dist)))
-    br_x = int(round(max(0, agent_center[1] + np.sqrt(2) * max_dist)))
-    br_y = int(round(max(0, agent_center[0] + np.sqrt(2) * max_dist)))
+    additonal = 1.2 #np.sqrt(2)
+    tl_x = int(round(max(0, agent_center[1] - additonal * max_dist)))
+    tl_y = int(round(max(0, agent_center[0] - additonal * max_dist)))
+    br_x = int(round(max(0, agent_center[1] + additonal * max_dist)))
+    br_y = int(round(max(0, agent_center[0] + additonal * max_dist)))
+    assert tl_x*tl_y*br_y*br_x != 0, (tl_x, tl_y, br_y, br_x)
 
     img = img[tl_x:br_x, tl_y:br_y]
     mask = mask[tl_x:br_x, tl_y:br_y]
@@ -285,7 +288,7 @@ def expand(border, img, mask):
 
 def draw_h(draw_traj, img, path, scale_factor, border):
     if draw_traj:
-        R = 2
+        R = 5
         for pose in path:
             if np.linalg.norm(pose - np.array([-1., -1.])) > 1e-6:
                 pass
