@@ -12,6 +12,7 @@ try:
     from utils import trajectory_orientation, rotate_image
     from utils import sdd_crop_and_rotate, transform_points
     from config import cfg
+    from transformations import ChangeOrigin
 except:
     # relative import
     from .force_from_txt import Force_from_txt
@@ -20,6 +21,7 @@ except:
     from .utils import trajectory_orientation, rotate_image
     from .utils import sdd_crop_and_rotate, transform_points
     from .config import cfg
+    from .transformations import ChangeOrigin
 
 import math
 from tqdm import tqdm
@@ -372,7 +374,8 @@ class DatasetFromTxt(torch.utils.data.Dataset):
                 # time_sorted_hist[:, :, 2:] += self.loader.border_datastes["SDD"] // self.loader.resize_datastes["SDD"]
                 # time_sorted_future[:, :, 2:] += self.loader.border_datastes["SDD"] // self.loader.resize_datastes["SDD"]
                 res = self.crop_and_normilize(agent_future, agent_hist_avail, agent_history, file, hist_avail, img,
-                                              target_avil, time_sorted_hist, forces, mask, border_width=self.loader.border_datastes["SDD"])
+                                              target_avil, time_sorted_hist, forces, mask,
+                                              border_width=self.loader.border_datastes["SDD"], transform=transform)
                 # print(os.getpid(), 3, time.time())
 
             else:
@@ -444,7 +447,7 @@ class DatasetFromTxt(torch.utils.data.Dataset):
 
 
     def crop_and_normilize(self, agent_future, agent_hist_avail, agent_history, file, hist_avail, img, target_avil,
-                           time_sorted_hist, forces, mask, border_width):
+                           time_sorted_hist, forces, mask, border_width, transform):
 
         # rotate in a such way that last hisory points are horizontal (elft to right),
         # crop to spec in cfg area and resize
@@ -461,116 +464,119 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         else:
             img, globPix_to_locraster, scale,\
             mask, map_to_local,\
-            (tl_y, tl_x, br_y, br_x) = sdd_crop_and_rotate(img, agent_history[:, 2:],
+            (tl_y, tl_x, br_y, br_x), rotation_matrix = sdd_crop_and_rotate(img, agent_history[:, 2:],
                                                                    border_width=border_width,
                                                                    draw_traj=1,
                                                                    pix_to_m_cfg=self.cfg['SDD_scales'],
                                                                    cropping_cfg=self.cfg['cropping_cfg'], file=file,
                                                                    mask=mask,
-                                                                   scale_factor=self.loader.resize_datastes["SDD"])
+                                                                   scale_factor=self.loader.resize_datastes["SDD"],
+                                                                   transform=transform)
 
         import cv2
+
+        ###
+        agent_center_intermidiate = transform @ np.append(agent_history[:, 2:][0], 1)
+        assert np.allclose(agent_center_intermidiate, rotation_matrix @ agent_center_intermidiate)
+        #### radius = int(round(max(np.linalg.norm((transform @ np.append(agent_history[:, 2:][0], 1))[:2] - np.array([tl_x, tl_y])), np.linalg.norm((transform @ np.append(agent_history[:, 2:][0], 1))[:2] - np.array([br_x, br_y])))))
+        radius = np.sqrt(2) * (round(
+            max(np.linalg.norm((transform @ np.append(agent_history[:, 2:][0], 1))[:2] - np.array([tl_x, tl_y])),
+                np.linalg.norm((transform @ np.append(agent_history[:, 2:][0], 1))[:2] - np.array([br_x, br_y])))))
+
+        img = img[int(agent_center_intermidiate[1] - radius): int(agent_center_intermidiate[1] + radius),
+                  int(agent_center_intermidiate[0] - radius): int(agent_center_intermidiate[0] + radius)]
+        if mask is not None:
+            mask = mask[int(agent_center_intermidiate[1] - radius): int(agent_center_intermidiate[1] + radius),
+                      int(agent_center_intermidiate[0] - radius): int(agent_center_intermidiate[0] + radius)]
+        tl_x -= agent_center_intermidiate[0] - radius
+        tl_y -= agent_center_intermidiate[1] - radius
+        br_y -= agent_center_intermidiate[1] - radius
+        br_x -= agent_center_intermidiate[0] - radius
+
         img_size = (int(0.6*self.loader.img_size["SDD"][0]), int(0.6*self.loader.img_size["SDD"][1])) #self.loader.resize_datastes["SDD"]*100
-        # print(img_size)
-        # print(img.shape)
-        # global max_size_x, max_size_y
-        # max_size_x = max(max_size_x, img.shape[0])
-        # print(max_size_x, max_size_y)
-        # max_size_y = max(max_size_y, img.shape[1])
-        # print(max_size_x, max_size_y)
-
         new_im = np.zeros((img_size[0], img_size[1], 3), dtype=np.uint8)
-        new_mask = np.zeros((img_size[0], img_size[1]), dtype=np.uint8)
         new_im[:img.shape[0], :img.shape[1]] = np.copy(img)
-        #
-        new_mask[:img.shape[0], :img.shape[1]] = np.copy(mask)
-
-        # global idk
-
-        # img = cv2.warpAffine(img, map_to_local[:2, :], (img.shape[1], img.shape[0]))
-        # img = img[int(tl_x):int(br_x), int(tl_y):int(br_y)]
-        # img = cv2.resize(img, (336,336))
-        # mask = cv2.warpAffine(mask, map_to_local[:2, :], (img.shape[1], img.shape[0]))
-        # mask = mask[int(tl_x):int(br_x), int(tl_y):int(br_y)]
-        # mask = cv2.resize(mask, (336, 336))
-        # dst = cv2.warpAffine(img, map_to_local[:2, :], (img.shape[1], img.shape[0]))
-        # plt.imshow(dst[int(tl_x):int(br_x), int(tl_y):int(br_y)])
-        # plt.savefig(str(idk)+".jpg")
-        # idk+=1
-
         img = new_im
-        mask = new_mask
+        co_operator = ChangeOrigin(new_origin=((agent_center_intermidiate[0] - radius, agent_center_intermidiate[1] - radius)), rotation=np.eye(2))
+
+        #TODO: doesnt work?
+        rotation_matrix = co_operator.transformation_matrix @ rotation_matrix
+        if mask is not None:
+            new_mask = np.zeros((img_size[0], img_size[1], 1), dtype=np.uint8)
+            new_mask[:mask.shape[0], :mask.shape[1]] = np.copy(mask)
+            #
+            # new_mask[:img.shape[0], :img.shape[1]] = np.copy(mask)
+            mask = new_mask
+
         pix_to_m = np.eye(3) * self.cfg['SDD_scales'][file]["scale"]
-        pix_to_m[:2, :2] = pix_to_m[:2, :2] @ np.array(
-            [[1 / scale[0], 0], [0, 1 / scale[1]]])  # np.linalg.inv(globPix_to_locraster[:2, :2])
+        pix_to_m[2, 2] = 1
+        agent_hist_M = transform_points(agent_history[:, self.loader.coors_row], pix_to_m @ globPix_to_locraster @ transform)
+        neigh_localM = transform_points(time_sorted_hist[:, :, self.loader.coors_row], pix_to_m @ globPix_to_locraster @ transform) - agent_hist_M[0]
+        target_localM = transform_points(agent_future[:, self.loader.coors_row], pix_to_m @ globPix_to_locraster @ transform) - agent_hist_M[0]
+        agent_hist_localM = agent_hist_M - agent_hist_M[0]
+
+        # pix_to_m[:2, :2] = pix_to_m[:2, :2] @ np.array(
+        #     [[1 / scale[0], 0], [0, 1 / scale[1]]])  # np.linalg.inv(globPix_to_locraster[:2, :2])
         local_hist_pix = transform_points(agent_history[:, self.loader.coors_row], globPix_to_locraster)
         local_neigh_pix = transform_points(time_sorted_hist[:, :, self.loader.coors_row], globPix_to_locraster)
         local_target_pix = transform_points(agent_future[:, self.loader.coors_row], globPix_to_locraster)
-        agent_from_glraster = np.eye(3)
 
-        # TODO :generalize
-        if img is not None:
-            agent_from_glraster[:2, 2] = -np.array(self.cfg['cropping_cfg']["image_shape"]) * np.array(
-                self.cfg['cropping_cfg']["agent_center"])
-        else:
-            agent_from_glraster[:2, 2] = -np.array([local_hist_pix[0, 0], local_hist_pix[0, 1]])
+        new_origin_operator = ChangeOrigin(new_origin=(globPix_to_locraster@agent_center_intermidiate)[:2], rotation=np.eye(2))
+        no_tm =new_origin_operator.transformation_matrix
 
-        agent_from_raster = pix_to_m @ agent_from_glraster
-        agent_from_raster[2, 2] = 1
-        raster_from_agent = np.eye(3) / self.cfg['SDD_scales'][file]["scale"]
-        raster_from_agent[2, 2] = 1
+        agent_from_raster = pix_to_m @ no_tm @ globPix_to_locraster
+        global_pix_from_raster = np.linalg.inv(transform) @ np.linalg.inv(globPix_to_locraster)
+        world_from_raster = pix_to_m @ np.linalg.inv(transform) @ np.linalg.inv(globPix_to_locraster)
 
-        rotation_matrix = np.eye(3)
-        if img is not None:
-            raster_from_agent[:2, 2] = np.array(self.cfg['cropping_cfg']["image_shape"]) * np.array(
-                self.cfg['cropping_cfg']["agent_center"])
-        else:
-
-            angle = trajectory_orientation(local_hist_pix[0], local_hist_pix[1])
-            if agent_hist_avail[1] != 1:
-                angle = 0
-            rotation_matrix = np.array([[np.cos(angle), np.sin(angle), 0],
-                                        [-np.sin(angle), np.cos(angle), 0],
-                                        [0, 0, 1]])
-            agent_from_raster = rotation_matrix @ agent_from_raster
-            raster_from_agent = np.linalg.inv(agent_from_raster)
-
-        agent_from_loraster = pix_to_m @ np.linalg.inv(raster_from_agent)
-        agent_hist_localM = transform_points(local_hist_pix, agent_from_raster)
-        neigh_localM = transform_points(local_neigh_pix, agent_from_raster)
-        target_localM = transform_points(local_target_pix, agent_from_raster)
-        # if np.linalg.norm(target_localM[-1, :]) * target_avil[-1] > 20:
-        #     print(target_localM[-1, :])
-        world_from_agent = globPix_to_locraster @ raster_from_agent
-        agent_from_world = pix_to_m @ globPix_to_locraster
-        raster_from_world = raster_from_agent @ agent_from_world
-        agent_hist_localM, neigh_localM = self.calc_speed_accel(agent_hist_localM, neigh_localM, agent_hist_avail,
-                                                                hist_avail)
+        raster_from_world = np.linalg.inv(world_from_raster)
+        world_from_agent = world_from_raster @ np.linalg.inv(agent_from_raster)
+        agent_from_world = np.linalg.inv(world_from_agent)
+        # agent_from_glraster = np.eye(3)
+        #
+        # # TODO :generalize
+        # if img is not None:
+        #     agent_from_glraster[:2, 2] = -np.array(self.cfg['cropping_cfg']["image_shape"]) * np.array(
+        #         self.cfg['cropping_cfg']["agent_center"])
+        # else:
+        #     agent_from_glraster[:2, 2] = -np.array([local_hist_pix[0, 0], local_hist_pix[0, 1]])
+        #
+        # agent_from_raster = pix_to_m @ agent_from_glraster
+        # agent_from_raster[2, 2] = 1
+        # raster_from_agent = np.eye(3) / self.cfg['SDD_scales'][file]["scale"]
+        # raster_from_agent[2, 2] = 1
+        #
+        # rotation_matrix = np.eye(3)
+        # if img is not None:
+        #     raster_from_agent[:2, 2] = np.array(self.cfg['cropping_cfg']["image_shape"]) * np.array(
+        #         self.cfg['cropping_cfg']["agent_center"])
+        # else:
+        #
+        #     angle = trajectory_orientation(local_hist_pix[0], local_hist_pix[1])
+        #     if agent_hist_avail[1] != 1:
+        #         angle = 0
+        #     rotation_matrix = np.array([[np.cos(angle), np.sin(angle), 0],
+        #                                 [-np.sin(angle), np.cos(angle), 0],
+        #                                 [0, 0, 1]])
+        #     agent_from_raster = rotation_matrix @ agent_from_raster
+        #     raster_from_agent = np.linalg.inv(agent_from_raster)
+        #
+        # agent_from_loraster = pix_to_m @ np.linalg.inv(raster_from_agent)
+        # agent_hist_localM = transform_points(local_hist_pix, agent_from_raster)
+        # neigh_localM = transform_points(local_neigh_pix, agent_from_raster)
+        # target_localM = transform_points(local_target_pix, agent_from_raster)
+        #
+        # world_from_agent = globPix_to_locraster @ raster_from_agent
+        # agent_from_world = pix_to_m @ globPix_to_locraster
+        # raster_from_world = raster_from_agent @ agent_from_world
+        # agent_hist_localM, neigh_localM = self.calc_speed_accel(agent_hist_localM, neigh_localM, agent_hist_avail,
+        #                                                         hist_avail)
         res = [img.astype(np.uint8), mask.astype(np.uint8), agent_hist_localM, agent_hist_avail,target_localM, target_avil, neigh_localM,
                hist_avail, np.linalg.inv(agent_from_raster), raster_from_world, world_from_agent, agent_from_world,
                np.linalg.inv(globPix_to_locraster), transform_points(forces, rotation_matrix), map_to_local,
                np.array([tl_y, tl_x, br_y, br_x])]
         return res
 
-        # res = {"img": img,
-        #        "segm": mask,
-        #        "agent_hist": agent_hist_localM,
-        #        "agent_hist_avail": agent_hist_avail,
-        #        "target": target_localM,
-        #        "target_avil": target_avil,
-        #        "neighb": neigh_localM,
-        #        "neighb_avail": hist_avail,
-        # 
-        #        "raster_from_agent": np.linalg.inv(agent_from_raster),
-        #        "raster_from_world": raster_from_world,
-        #        "world_from_agent": world_from_agent,
-        #        "agent_from_world": agent_from_world,
-        #        "loc_im_to_glob": np.linalg.inv(globPix_to_locraster),
-        #        "forces": transform_points(forces, rotation_matrix),
-        # 
-        #        "map_affine": map_to_local,
-        #        "cropping_points": np.array([tl_y, tl_x, br_y, br_x])}
-        # return res
+
 
 
 class NeighboursHistory:

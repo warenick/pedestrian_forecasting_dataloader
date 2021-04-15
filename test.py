@@ -9,8 +9,8 @@ files = [  # "biwi_eth/biwi_eth.txt",
         # "stanford/coupa_3.txt",
         # "stanford/deathCircle_0.txt",
     ]
-files = ["biwi_eth/biwi_eth.txt", "UCY/students01/students01.txt", "UCY/students03/students03.txt",
-                           "UCY/zara01/zara01.txt", "UCY/zara02/zara02.txt"]
+# files = ["biwi_eth/biwi_eth.txt", "UCY/students01/students01.txt", "UCY/students03/students03.txt",
+#                            "UCY/zara01/zara01.txt", "UCY/zara02/zara02.txt"]
 cfg["raster_params"]["use_segm"] = False
 dataset = DatasetFromTxt(path_, files, cfg)
 dataset[0]

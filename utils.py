@@ -14,6 +14,7 @@ except:
     from .config import SDD_scales, cropping_cfg
 import kornia
 import cv2
+from transformations import Rotate, Crop
 
 def preprocess_data(data, cfg, device="cpu") -> torch.tensor:
     imgs_tensor = (torch.tensor(data.image, device=device, dtype=torch.float32).permute(0, 3, 1, 2))/255
@@ -185,19 +186,37 @@ def crop_image(img, cfg, agent_center: np.array, pix_to_met, mask_pil):
     # size = img.size
     # np_img = np.asarray(img)
 
-    tl_x = max(0, agent_center[1] - cfg["agent_center"][1] * cfg["image_area_meters"][0] / pix_to_met)
-    tl_y = max(0, agent_center[0] - cfg["agent_center"][0] * cfg["image_area_meters"][1] / pix_to_met)
-    br_x = max(0, agent_center[1] + (1 - cfg["agent_center"][1]) * cfg["image_area_meters"][0] / pix_to_met)
-    br_y = max(0, agent_center[0] + (1 - cfg["agent_center"][0]) * cfg["image_area_meters"][1] / pix_to_met)
-    assert tl_x * tl_y * br_y * br_x != 0
-    image_resize_coef = [cfg["image_shape"][0] / abs(tl_y - br_y), cfg["image_shape"][1] / abs(tl_y - br_y)]
+    # position of [agent_x - 0.25area_x, agent_y - 0.5area_y] in meters
+    tl_meters = pix_to_met @ (np.append(agent_center, 1)) - np.array([cfg["agent_center"][0] * cfg["image_area_meters"][1],
+                          cfg["agent_center"][1] * cfg["image_area_meters"][0],
+                          0])
+
+    # position of [agent_x + 0.75area_x, agent_y + 0.5area_y]
+    br_meters = pix_to_met @ (np.append(agent_center, 1)) + np.array([(1 - cfg["agent_center"][0]) * cfg["image_area_meters"][1],
+                          (1 - cfg["agent_center"][1]) * cfg["image_area_meters"][0],
+                          0])
+
+    tl_pix = np.linalg.inv(pix_to_met) @ tl_meters
+    br_pix = np.linalg.inv(pix_to_met) @ br_meters
+    assert np.allclose((br_meters[:2] - tl_meters[:2]),
+                       np.array([cfg["image_area_meters"][0], cfg["image_area_meters"][1]]))
+
+    # tl_x = max(0, agent_center[1] - cfg["agent_center"][1] * cfg["image_area_meters"][0] / pix_to_met[0,0])
+    # tl_y = max(0, agent_center[0] - cfg["agent_center"][0] * cfg["image_area_meters"][1] / pix_to_met[0,0])
+    # br_x = max(0, agent_center[1] + (1 - cfg["agent_center"][1]) * cfg["image_area_meters"][0] / pix_to_met[0,0])
+    # br_y = max(0, agent_center[0] + (1 - cfg["agent_center"][0]) * cfg["image_area_meters"][1] / pix_to_met[0,0])
+    # assert tl_x * tl_y * br_y * br_x != 0
+    image_resize_coef = [cfg["image_shape"][0] / abs(tl_pix[1] - br_pix[1]), cfg["image_shape"][1] / abs(tl_pix[0] - br_pix[0])]
+
     # cropped = img.crop((tl_y, tl_x, br_y, br_x))
     # mask_pil_cropped = mask_pil.crop((tl_y, tl_x, br_y, br_x))
     # image_resize_coef = [cfg["image_shape"][0] / cropped.size[0], cfg["image_shape"][1] / cropped.size[1]]
 
     # cropped = cropped.resize(cfg["image_shape"])
     # mask_pil_cropped = mask_pil_cropped.resize(cfg["image_shape"], 0)
-    return None, image_resize_coef, None, (tl_y, tl_x, br_y, br_x)
+
+    # img[int(tl_pix[1]):int(br_pix[1]), int(tl_pix[0]):int(br_pix[0])]
+    return None, image_resize_coef, None, (int(tl_pix[1]), int(tl_pix[0]), int(br_pix[1]), int(br_pix[0]))
 
 
 def calc_transform_matrix(init_coord, angle, scale, output_shape: List):
@@ -227,7 +246,7 @@ def calc_transform_matrix(init_coord, angle, scale, output_shape: List):
 
 
 def sdd_crop_and_rotate(img: np.array, path, border_width=400, draw_traj=1, pix_to_m_cfg=SDD_scales,
-                        cropping_cfg=cropping_cfg, file=None, mask=None, scale_factor=1):
+                        cropping_cfg=cropping_cfg, file=None, mask=None, scale_factor=1, transform=None):
     # print(img.dtype)
     # img_pil = Image.fromarray(np.asarray(img, dtype="uint8"))
     # mask_pil = Image.fromarray(np.asarray(mask, dtype="uint8"))
@@ -236,7 +255,7 @@ def sdd_crop_and_rotate(img: np.array, path, border_width=400, draw_traj=1, pix_
     scaled_border = border_width // scale_factor
 
     scale = pix_to_m_cfg[file]["scale"]
-    draw_h(draw_traj, img, path, scale_factor, scaled_border)
+    draw_h(draw_traj, img, path, transform)
     # img_b, mask_b = expand(border, img, mask)
     # mask_pil = ImageOps.expand(mask_pil, (border, border))
 
@@ -244,35 +263,34 @@ def sdd_crop_and_rotate(img: np.array, path, border_width=400, draw_traj=1, pix_
     if np.linalg.norm(path[1] - np.array([-1., -1.])) < 1e-6:
         angle_deg = 0
     angle_rad = angle_deg / 180 * math.pi
-    agent_center = path[0] / scale_factor + scaled_border
+    # agent_center = path[0] / scale_factor + scaled_border
+    agent_center = (transform @ np.append(path[0], 1))[:2]
+    rotate_operator = Rotate(angle_deg, agent_center)
+    tm = rotate_operator.transformation_matrix
 
-    ## pre crop?
-    max_dist = max(cropping_cfg["agent_center"][1] * cropping_cfg["image_area_meters"][0] / (scale * scale_factor),
-        cropping_cfg["agent_center"][0] * cropping_cfg["image_area_meters"][1] / (scale * scale_factor),
-        (1 - cropping_cfg["agent_center"][1]) * cropping_cfg["image_area_meters"][0] / (scale * scale_factor),
-        (1 - cropping_cfg["agent_center"][0]) * cropping_cfg["image_area_meters"][1] / (scale * scale_factor))
+    # scale -> from image_pix (original) to meters
+    pix_to_meters = (np.eye(3) * scale)
+    pix_to_meters[2, 2] = 1
+    # transform -> from image to numpy
 
-    additonal = 1.2 #np.sqrt(2)
-    tl_x = int(round(max(0, agent_center[1] - additonal * max_dist)))
-    tl_y = int(round(max(0, agent_center[0] - additonal * max_dist)))
-    br_x = int(round(max(0, agent_center[1] + additonal * max_dist)))
-    br_y = int(round(max(0, agent_center[0] + additonal * max_dist)))
-    assert tl_x*tl_y*br_y*br_x != 0, (tl_x, tl_y, br_y, br_x)
-
-    img = img[tl_x:br_x, tl_y:br_y]
-    mask = mask[tl_x:br_x, tl_y:br_y]
-
-    _, map_to_local, _ = rotate_image(None, angle_deg, center=(img.shape[0]//2, img.shape[1]//2), mask=None)
+    # pix_to_meters from numpy_pix to meters =  (orig_im to meters)  @  (numpy_im to orig_image)
+    pix_to_meters = pix_to_meters @ np.linalg.inv(transform)
 
     crop_img, scale, crop_mask, (tl_y, tl_x, br_y, br_x) = crop_image(img, cropping_cfg,
-                                                                      agent_center=(img.shape[0]//2, img.shape[1]//2),
-                                                                      pix_to_met=scale * scale_factor,
+                                                                      agent_center=agent_center,
+                                                                      pix_to_met=pix_to_meters,
                                                                       mask_pil=mask)
-    for index in range(len(scale)):
-        scale[index] = scale[index] / scale_factor
-    transf = calc_transform_matrix(path[0], angle_rad, scale, cropping_cfg["image_shape"])
+
+    scale_reshaping = np.eye(3)
+    scale_reshaping[:2, :2] = scale_reshaping[:2, :2] * np.array(scale)
+    # for index in range(len(scale)):
+    #     scale[index] = scale[index] / scale_factor
+    # transf = calc_transform_matrix(path[0], angle_rad, scale, cropping_cfg["image_shape"])
+    cr_operator = Crop((tl_x, tl_y), (br_x, br_y))
+    cr_tm = cr_operator.transformation_matrix
+    transf = scale_reshaping @ cr_tm @ tm
     #     (init_coord, angle, scale, border_w=0):
-    return img, transf, scale, mask, map_to_local, (tl_y, tl_x, br_y, br_x)
+    return img, transf, scale_reshaping, mask, tm, (tl_y, tl_x, br_y, br_x), tm
 
 
 def expand(border, img, mask):
@@ -286,16 +304,13 @@ def expand(border, img, mask):
     return img_b, mask_b
 
 
-def draw_h(draw_traj, img, path, scale_factor, border):
+def draw_h(draw_traj, img, path, transform):
     if draw_traj:
         R = 5
         for pose in path:
             if np.linalg.norm(pose - np.array([-1., -1.])) > 1e-6:
-                pass
-                cv2.circle(img, (int(pose[0] / scale_factor + border), int(pose[1] / scale_factor + border)), R, (0, 0, 255), 1)
-                # draw.ellipse((pose[0] / scale_factor - R, pose[1] / scale_factor - R,
-                #               pose[0] / scale_factor + R, pose[1] / scale_factor + R),
-                #              fill='blue', outline='blue')
+                new_pose = transform @ np.array([pose[0], pose[1], 1])
+                cv2.circle(img, (int(new_pose[0]), int(new_pose[1])), R, (0, 0, 255), 1)
 
 
 def vis_pdf(image, distrib, transform_from_pix_to_m):

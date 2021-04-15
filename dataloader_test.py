@@ -31,10 +31,10 @@ def visualize_test():
         ind = int(np.random.rand() * len(dataset))
         data = dataset[ind]
 
-        data[0] = cv2.warpAffine(data[0], data[14][:2, :], (data[0].shape[1], data[0].shape[0]))
-        data[0] = data[0][int(data[15][1]):int(data[15][3]), int(data[15][0]):int(data[15][2])]
-        data[0] = cv2.resize(data[0], (112, 112))
-        img = Image.fromarray(np.asarray(data[0], dtype="uint8"))
+        img = cv2.warpAffine(data[0], data[14][:2, :], (data[0].shape[1], data[0].shape[0]))
+        img = img[int(data[15][1]):int(data[15][3]), int(data[15][0]):int(data[15][2])]
+        img = cv2.resize(img, (112, 112))
+        img = Image.fromarray(np.asarray(img, dtype="uint8"))
         draw = ImageDraw.Draw(img)
         if data[3][1] == 0:
             continue
@@ -107,7 +107,7 @@ if __name__ == "__main__":
         val_dataloader = DataLoader(val_ds, batch_size=256,
                                     shuffle=False, num_workers=0, collate_fn=collate_wrapper)
 
-        train_poses = np.zeros((0,2))
+        train_poses = np.zeros((0, 2))
         val_poses = np.zeros((0, 2))
         from utils import preprocess_data
         import time

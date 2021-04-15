@@ -88,7 +88,7 @@ class AddBorder(Transformation):
 
 
 class Rotate(Transformation):
-    def __init__(self, angle=0, rot_center=(1, 1)):
+    def __init__(self, angle=360, rot_center=(1, 1)):
         super().__init__()
         self.angle = angle
         self.rot_center = rot_center
