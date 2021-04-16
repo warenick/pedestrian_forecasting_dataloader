@@ -16,7 +16,7 @@ once = 1
 
 def visualize_test():
     Rad = 2
-    cfg["raster_params"]["use_map"] = True
+    cfg["raster_params"]["use_map"] = False
     cfg["raster_params"]["normalize"] = True
     files = [
         "SDD/bookstore_0.txt"
@@ -30,56 +30,59 @@ def visualize_test():
     for i in tqdm(range(0, len(dataset))):
         ind = int(np.random.rand() * len(dataset))
         data = dataset[ind]
-
-        img = cv2.warpAffine(data[0], data[14][:2, :], (data[0].shape[1], data[0].shape[0]))
-        img = img[int(data[15][1]):int(data[15][3]), int(data[15][0]):int(data[15][2])]
-        img = cv2.resize(img, (112, 112))
-        img = Image.fromarray(np.asarray(img, dtype="uint8"))
-        draw = ImageDraw.Draw(img)
-        if data[3][1] == 0:
-            continue
-        if draw_a_h:
-            for num, pose in enumerate(data[2]):
-                if data[3][num]:
-                    # pose = data["glob_to_local"] @ np.array([pose[0], pose[1], 1.])
-                    pose_raster = data[8] @ np.array([pose[0], pose[1], 1.])
-                    draw.ellipse(
-                        (pose_raster[0] - Rad, pose_raster[1] - Rad, pose_raster[0] + Rad, pose_raster[1] + Rad),
-                        fill='red', outline='red')
-                    # if num == 0:
-                    if draw_speeds:
-
-                        na = np.asarray(img)
-                        if (np.sum(data["agent_speed"][num] ** 2) > 1e-6) and (
-                                data["agent_hist_avail"][num] * data["agent_hist_avail"][num + 1]):
-                            speed = data["agent_speed"][num]
-                            na = cv2.arrowedLine(na, (int(pose_raster[0]), int(pose_raster[1])), (
-                            int(pose_raster[0] + (speed[0] * 300)), int(pose_raster[1] + (speed[1] * 300))), (0, 0, 0),
-                                                 8)
-                            img = Image.fromarray(np.asarray(na, dtype="uint8"))
-                            draw = ImageDraw.Draw(img)
-
-        if draw_n:
-            for ped in range(0, data[6].shape[0]):
-                for num, pose in enumerate(data[6][ped, :, :]):
-                    if data[7][ped, num]:
+        if cfg["raster_params"]["use_map"]:
+            if cfg["raster_params"]["normalize"]:
+                img = cv2.warpAffine(data[0], data[14][:2, :], (data[0].shape[1], data[0].shape[0]))
+                img = img[int(data[15][1]):int(data[15][3]), int(data[15][0]):int(data[15][2])]
+                img = cv2.resize(img, (cfg["cropping_cfg"]["image_shape"][0], cfg["cropping_cfg"]["image_shape"][1]))
+            else:
+                img = data[0]
+            img = Image.fromarray(np.asarray(img, dtype="uint8"))
+            draw = ImageDraw.Draw(img)
+            if data[3][1] == 0:
+                continue
+            if draw_a_h:
+                for num, pose in enumerate(data[2]):
+                    if data[3][num]:
+                        # pose = data["glob_to_local"] @ np.array([pose[0], pose[1], 1.])
                         pose_raster = data[8] @ np.array([pose[0], pose[1], 1.])
-                        rgb = (int(255 * ((num + 1) / 8)), int(255 * ((num + 1) / 8)), int(255 * ((num + 1) / 8)))
-                        # draw.ellipse((pose_raster[0] - Rad, pose_raster[1] - Rad, pose_raster[0] + Rad, pose_raster[1] + Rad), fill='#ffcc99', outline='#ffcc99')
                         draw.ellipse(
                             (pose_raster[0] - Rad, pose_raster[1] - Rad, pose_raster[0] + Rad, pose_raster[1] + Rad),
-                            fill=rgb, outline='#ffcc99')
+                            fill='red', outline='red')
+                        # if num == 0:
+                        if draw_speeds:
 
-        if draw_targets:
-            for num, pose in enumerate(data[4]):
-                if data[5][num]:
-                    R = 4
-                    # pose = data["glob_to_local"] @ np.array([pose[0], pose[1], 1.])
-                    pose_raster = data[8] @ np.array([pose[0], pose[1], 1.])
-                    draw.ellipse(
-                        (pose_raster[0] - Rad, pose_raster[1] - Rad, pose_raster[0] + Rad, pose_raster[1] + Rad),
-                        fill='#33cc33', outline='#33cc33')
-        img.save("test/"+str(i)+".jpg")
+                            na = np.asarray(img)
+                            if (np.sum(data["agent_speed"][num] ** 2) > 1e-6) and (
+                                    data["agent_hist_avail"][num] * data["agent_hist_avail"][num + 1]):
+                                speed = data["agent_speed"][num]
+                                na = cv2.arrowedLine(na, (int(pose_raster[0]), int(pose_raster[1])), (
+                                int(pose_raster[0] + (speed[0] * 300)), int(pose_raster[1] + (speed[1] * 300))), (0, 0, 0),
+                                                     8)
+                                img = Image.fromarray(np.asarray(na, dtype="uint8"))
+                                draw = ImageDraw.Draw(img)
+
+            if draw_n:
+                for ped in range(0, data[6].shape[0]):
+                    for num, pose in enumerate(data[6][ped, :, :]):
+                        if data[7][ped, num]:
+                            pose_raster = data[8] @ np.array([pose[0], pose[1], 1.])
+                            rgb = (int(255 * ((num + 1) / 8)), int(255 * ((num + 1) / 8)), int(255 * ((num + 1) / 8)))
+                            # draw.ellipse((pose_raster[0] - Rad, pose_raster[1] - Rad, pose_raster[0] + Rad, pose_raster[1] + Rad), fill='#ffcc99', outline='#ffcc99')
+                            draw.ellipse(
+                                (pose_raster[0] - Rad, pose_raster[1] - Rad, pose_raster[0] + Rad, pose_raster[1] + Rad),
+                                fill=rgb, outline='#ffcc99')
+
+            if draw_targets:
+                for num, pose in enumerate(data[4]):
+                    if data[5][num]:
+                        R = 4
+                        # pose = data["glob_to_local"] @ np.array([pose[0], pose[1], 1.])
+                        pose_raster = data[8] @ np.array([pose[0], pose[1], 1.])
+                        draw.ellipse(
+                            (pose_raster[0] - Rad, pose_raster[1] - Rad, pose_raster[0] + Rad, pose_raster[1] + Rad),
+                            fill='#33cc33', outline='#33cc33')
+            img.save("test/"+str(i)+".jpg")
         # pix_path = torch.einsum("bki, bji-> bjk", torch.tensor(data.loc_im_to_glob @ data.raster_from_agent).float(),
         #                         path_.float())
         # print()
@@ -94,7 +97,7 @@ if __name__ == "__main__":
     cfg["raster_params"]["use_segm"] = False
 
     # path_ = "/media/robot/hdd1/hdd_repos/pedestrian_forecasting_dataloader/data/train/"
-    path_ = "data/train/"
+    path_ = "/media/robot/hdd1/hdd_repos/pedestrian_forecasting_dataloader/data/train/"
     files = [
         "SDD"
     ]
@@ -117,7 +120,7 @@ if __name__ == "__main__":
             imgs, masks = preprocess_data(data, cfg, "cuda")
             # print(time.time() - st)
 
-            if num>100:
+            if num>=50:
                 exit()
         for num,data in enumerate(tqdm(val_dataloader)):
             val_poses = np.concatenate((val_poses, data.history_positions[:,:,:2][data.history_av != 0].reshape(-1,2)))

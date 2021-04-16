@@ -105,6 +105,7 @@ class DatasetFromTxt(torch.utils.data.Dataset):
             elif ("stanford" in file) or ("SDD" in file):
                 dataset = file[file.index("/") + 1:file.index(".")]
                 pix_to_m = np.eye(3) * self.cfg['SDD_scales'][dataset]["scale"]
+                pix_to_m[2, 2] = 1
                 pix_to_m = {"scale": pix_to_m}
             elif "biwi_eth" in file:
                 pix_to_m = self.cfg['eth_univ_h']
@@ -120,37 +121,44 @@ class DatasetFromTxt(torch.utils.data.Dataset):
                     time_sorted_hist[:, :, self.loader.coors_row],
                     np.linalg.inv(pix_to_m["scale"]))
 
+
+
             agent_history = transform_points(agent_history[:, 2:], pix_to_m["scale"])
             agent_future = transform_points(agent_future[:, 2:], pix_to_m["scale"])
+            to_localM_transform = np.eye(3)
             if self.cfg["raster_params"]["normalize"]:
-                translation = 1 * agent_history[0]
-            else:
-                translation = np.zeros(2)
-            agent_history -= translation
-            agent_future -= translation
+                co_operator = ChangeOrigin(new_origin=agent_history[0][:2], rotation=np.eye(2))
+                to_localM_transform = co_operator.transformation_matrix
+
+            agent_history = transform_points(agent_history, to_localM_transform)
+            agent_future = transform_points(agent_future, to_localM_transform)
 
             # time_sorted_future[:,:,2:] -= translation
-            neigh_localM = transform_points(time_sorted_hist[:, :, self.loader.coors_row], pix_to_m["scale"])
-            neigh_localM -= translation
+            neigh_localM = transform_points(time_sorted_hist[:, :, self.loader.coors_row], co_operator.transformation_matrix@pix_to_m["scale"])
+            raster_from_agent = np.linalg.inv(co_operator.transformation_matrix)@ np.linalg.inv(pix_to_m["scale"])
 
             agent_history, neigh_localM = self.calc_speed_accel(agent_history, neigh_localM, agent_hist_avail,
                                                                 hist_avail)
-            return {"img": None,
-                    "agent_hist": agent_history,
-                    "agent_hist_avail": agent_hist_avail,
-                    "target": agent_future,
-                    "target_avil": target_avil,
-                    "neighb": neigh_localM,
-                    "neighb_avail": hist_avail,
-
-                    "raster_from_agent": np.eye(3),
-                    "raster_from_world": np.eye(3),  # raster_from_world,
-                    "world_from_agent": np.eye(3),  # world_from_agent,
-                    "agent_from_world": np.eye(3),  # agent_from_world
-                    "forces": np.eye(3),
-                    "loc_im_to_glob": np.eye(3),
-                    "file": file[file.index("/") + 1:]
-                    }
+            res = [img, mask, agent_history, agent_hist_avail, agent_future, target_avil,
+                   neigh_localM, hist_avail, raster_from_agent, np.eye(3), np.eye(3), np.eye(3),
+                   np.eye(3), forces, None, None]
+            return res
+            # return {"img": None,
+            #         "agent_hist": agent_history,
+            #         "agent_hist_avail": agent_hist_avail,
+            #         "target": agent_future,
+            #         "target_avil": target_avil,
+            #         "neighb": neigh_localM,
+            #         "neighb_avail": hist_avail,
+            #
+            #         "raster_from_agent": np.eye(3),
+            #         "raster_from_world": np.eye(3),  # raster_from_world,
+            #         "world_from_agent": np.eye(3),  # world_from_agent,
+            #         "agent_from_world": np.eye(3),  # agent_from_world
+            #         "forces": np.eye(3),
+            #         "loc_im_to_glob": np.eye(3),
+            #         "file": file[file.index("/") + 1:]
+            #         }
 
         # if map:
         if "UCY" in file or "eth" in file:
@@ -382,16 +390,23 @@ class DatasetFromTxt(torch.utils.data.Dataset):
 
                 dataset = file[:file.index("/")]
                 file = file[file.index("/") + 1:file.index(".")]
-                raster_to_agent = np.eye(3) * self.cfg['SDD_scales'][file]["scale"]
-                raster_to_agent[2, 2] = 1
-                agent_hist_localM = transform_points(agent_history[:, self.loader.coors_row], raster_to_agent)
-                target_localM = transform_points(agent_future[:, self.loader.coors_row], raster_to_agent)
-                neigh_localM = transform_points(time_sorted_hist[:, :, self.loader.coors_row], raster_to_agent)
-                neigh_futureM = transform_points(time_sorted_future[:, :, self.loader.coors_row], raster_to_agent)
+                global_to_rast = transform+0
+                pix_to_m = (np.eye(3) * self.cfg['SDD_scales'][file]["scale"])
+                pix_to_m[2,2] = 1
+
+
+                agent_center_local_pix = transform @ (np.append(agent_history[:, self.loader.coors_row][0],1))
+                co_operator = ChangeOrigin(new_origin=agent_center_local_pix[:2], rotation=np.eye(2))
+                raster_to_agent = pix_to_m @ co_operator.transformation_matrix
+                agent_hist_localM = transform_points(agent_history[:, self.loader.coors_row],  raster_to_agent @ transform)
+                target_localM = transform_points(agent_future[:, self.loader.coors_row],  raster_to_agent@ transform)
+                neigh_localM = transform_points(time_sorted_hist[:, :, self.loader.coors_row],  raster_to_agent@ transform)
+                neigh_futureM = transform_points(time_sorted_future[:, :, self.loader.coors_row],  raster_to_agent@ transform)
                 raster_from_agent = np.linalg.inv(raster_to_agent)
-                raster_from_world = raster_from_agent
-                world_from_agent = np.eye(3)
-                agent_from_world = np.eye(3)
+
+                raster_from_world = transform
+                world_from_agent = np.linalg.inv(transform @ pix_to_m @ co_operator.transformation_matrix)
+                agent_from_world = np.linalg.inv(world_from_agent)
                 speed = -np.gradient(agent_hist_localM, axis=0) / (12 * self.loader.delta_t[dataset])  # TODO: 12?
                 speed[:, 0][speed[:, 0] == 0] += 1e-6
                 orientation = np.arctan((speed[:, 1]) / (speed[:, 0]))
@@ -401,26 +416,36 @@ class DatasetFromTxt(torch.utils.data.Dataset):
                 neigh_orient = np.arctan((neigh_speed[:, :, 1]) / (neigh_speed[:, :, 0]))
                 agent_hist_localM, neigh_localM = self.calc_speed_accel(agent_hist_localM, neigh_localM,
                                                                         agent_hist_avail, neigh_localM)
-                res = {"img": np.copy(img),
-                       "agent_speed": speed,
-                       "agent_orientation": orientation,
-                       "agent_hist": agent_hist_localM,
-                       "agent_hist_avail": agent_hist_avail,
-                       "target": target_localM,
-                       "target_avil": target_avil,
-                       "neighb": neigh_localM,  # history -  shape[num_peds, time. coords]
-                       "neighb_avail": hist_avail,  # history availability -  shape[num_peds, time]
-                       "neigh_future": neigh_futureM,  # future -  shape[num_peds, time, coords]
-                       "neigh_future_avail": neighb_future_avail,  # future availability -  shape[num_peds, time]
-                       "neigh_speed": neigh_speed,  # history speeds -  shape[num_peds, time, speeds (vx, vy)]
-                       "neigh_orientation": neigh_orient,  # history orientation -  shape[num_peds, time, orient]
 
-                       "raster_from_agent": raster_from_agent,
-                       "raster_from_world": raster_from_world,
-                       "world_from_agent": world_from_agent,
-                       "agent_from_world": agent_from_world,
-                       "forces": forces,
-                       }
+                res = [img.astype(np.uint8), mask, agent_hist_localM, agent_hist_avail, target_localM, target_avil,
+                       neigh_localM,
+                       hist_avail, np.linalg.inv(raster_to_agent), raster_from_world, world_from_agent,
+                       agent_from_world,
+                       np.linalg.inv(raster_to_agent) @ world_from_agent, forces,
+                       None,
+
+                       None]
+                #
+                # res = {"img": np.copy(img),
+                #        "agent_speed": speed,
+                #        "agent_orientation": orientation,
+                #        "agent_hist": agent_hist_localM,
+                #        "agent_hist_avail": agent_hist_avail,
+                #        "target": target_localM,
+                #        "target_avil": target_avil,
+                #        "neighb": neigh_localM,  # history -  shape[num_peds, time. coords]
+                #        "neighb_avail": hist_avail,  # history availability -  shape[num_peds, time]
+                #        "neigh_future": neigh_futureM,  # future -  shape[num_peds, time, coords]
+                #        "neigh_future_avail": neighb_future_avail,  # future availability -  shape[num_peds, time]
+                #        "neigh_speed": neigh_speed,  # history speeds -  shape[num_peds, time, speeds (vx, vy)]
+                #        "neigh_orientation": neigh_orient,  # history orientation -  shape[num_peds, time, orient]
+                #
+                #        "raster_from_agent": raster_from_agent,
+                #        "raster_from_world": raster_from_world,
+                #        "world_from_agent": world_from_agent,
+                #        "agent_from_world": agent_from_world,
+                #        "forces": forces,
+                #        }
             return res
 
     def calc_speed_accel(self, agent_history, neigh_localM, agent_history_av, neigh_localM_av):
@@ -477,7 +502,7 @@ class DatasetFromTxt(torch.utils.data.Dataset):
 
         ###
         agent_center_intermidiate = transform @ np.append(agent_history[:, 2:][0], 1)
-        assert np.allclose(agent_center_intermidiate, rotation_matrix @ agent_center_intermidiate)
+        # assert np.allclose(agent_center_intermidiate, rotation_matrix @ agent_center_intermidiate)
         #### radius = int(round(max(np.linalg.norm((transform @ np.append(agent_history[:, 2:][0], 1))[:2] - np.array([tl_x, tl_y])), np.linalg.norm((transform @ np.append(agent_history[:, 2:][0], 1))[:2] - np.array([br_x, br_y])))))
         radius = np.sqrt(2) * (round(
             max(np.linalg.norm((transform @ np.append(agent_history[:, 2:][0], 1))[:2] - np.array([tl_x, tl_y])),
@@ -488,92 +513,65 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         if mask is not None:
             mask = mask[int(agent_center_intermidiate[1] - radius): int(agent_center_intermidiate[1] + radius),
                       int(agent_center_intermidiate[0] - radius): int(agent_center_intermidiate[0] + radius)]
-        tl_x -= agent_center_intermidiate[0] - radius
-        tl_y -= agent_center_intermidiate[1] - radius
-        br_y -= agent_center_intermidiate[1] - radius
-        br_x -= agent_center_intermidiate[0] - radius
+        tl_x_intermidiate = tl_x - (agent_center_intermidiate[0] - radius)
+        tl_y_intermidiate = tl_y - (agent_center_intermidiate[1] - radius)
+        br_y_intermidiate = br_y - (agent_center_intermidiate[1] - radius)
+        br_x_intermidiate = br_x - (agent_center_intermidiate[0] - radius)
 
-        img_size = (int(0.6*self.loader.img_size["SDD"][0]), int(0.6*self.loader.img_size["SDD"][1])) #self.loader.resize_datastes["SDD"]*100
+        img_size = (int(0.85*self.loader.img_size["SDD"][0]), int(0.85*self.loader.img_size["SDD"][1])) #self.loader.resize_datastes["SDD"]*100
         new_im = np.zeros((img_size[0], img_size[1], 3), dtype=np.uint8)
         new_im[:img.shape[0], :img.shape[1]] = np.copy(img)
         img = new_im
         co_operator = ChangeOrigin(new_origin=((agent_center_intermidiate[0] - radius, agent_center_intermidiate[1] - radius)), rotation=np.eye(2))
 
-        #TODO: doesnt work?
-        rotation_matrix = co_operator.transformation_matrix @ rotation_matrix
+
+        rotation_matrix_cropped = co_operator.transformation_matrix @ rotation_matrix @ np.linalg.inv(co_operator.transformation_matrix)
+
+        tl_co_operator = ChangeOrigin(
+            new_origin=((tl_x, tl_y)),
+            rotation=np.eye(2))
+
+        intermidiate_to_locraster = scale @ tl_co_operator.transformation_matrix @ rotation_matrix
+        # cv2.warpAffine(img, intermidiate_to_locraster[:2, :], (img.shape[1], img.shape[0]))
+
         if mask is not None:
             new_mask = np.zeros((img_size[0], img_size[1], 1), dtype=np.uint8)
             new_mask[:mask.shape[0], :mask.shape[1]] = np.copy(mask)
-            #
-            # new_mask[:img.shape[0], :img.shape[1]] = np.copy(mask)
-            mask = new_mask
+            mask = new_mask.astype(np.uint8)
+
 
         pix_to_m = np.eye(3) * self.cfg['SDD_scales'][file]["scale"]
         pix_to_m[2, 2] = 1
-        agent_hist_M = transform_points(agent_history[:, self.loader.coors_row], pix_to_m @ globPix_to_locraster @ transform)
-        neigh_localM = transform_points(time_sorted_hist[:, :, self.loader.coors_row], pix_to_m @ globPix_to_locraster @ transform) - agent_hist_M[0]
-        target_localM = transform_points(agent_future[:, self.loader.coors_row], pix_to_m @ globPix_to_locraster @ transform) - agent_hist_M[0]
-        agent_hist_localM = agent_hist_M - agent_hist_M[0]
 
-        # pix_to_m[:2, :2] = pix_to_m[:2, :2] @ np.array(
-        #     [[1 / scale[0], 0], [0, 1 / scale[1]]])  # np.linalg.inv(globPix_to_locraster[:2, :2])
-        local_hist_pix = transform_points(agent_history[:, self.loader.coors_row], globPix_to_locraster)
-        local_neigh_pix = transform_points(time_sorted_hist[:, :, self.loader.coors_row], globPix_to_locraster)
-        local_target_pix = transform_points(agent_future[:, self.loader.coors_row], globPix_to_locraster)
+        new_origin_operator = ChangeOrigin(new_origin=(intermidiate_to_locraster @ agent_center_intermidiate)[:2], rotation=np.eye(2))
+        no_tm = new_origin_operator.transformation_matrix
 
-        new_origin_operator = ChangeOrigin(new_origin=(globPix_to_locraster@agent_center_intermidiate)[:2], rotation=np.eye(2))
-        no_tm =new_origin_operator.transformation_matrix
 
-        agent_from_raster = pix_to_m @ no_tm @ globPix_to_locraster
-        global_pix_from_raster = np.linalg.inv(transform) @ np.linalg.inv(globPix_to_locraster)
-        world_from_raster = pix_to_m @ np.linalg.inv(transform) @ np.linalg.inv(globPix_to_locraster)
+        agent_from_raster = pix_to_m @ no_tm
+        # global_pix_from_raster = np.linalg.inv(transform) @ np.linalg.inv(globPix_to_locraster)
+        world_from_raster = pix_to_m @ np.linalg.inv(intermidiate_to_locraster @ transform)
 
         raster_from_world = np.linalg.inv(world_from_raster)
         world_from_agent = world_from_raster @ np.linalg.inv(agent_from_raster)
         agent_from_world = np.linalg.inv(world_from_agent)
-        # agent_from_glraster = np.eye(3)
-        #
-        # # TODO :generalize
-        # if img is not None:
-        #     agent_from_glraster[:2, 2] = -np.array(self.cfg['cropping_cfg']["image_shape"]) * np.array(
-        #         self.cfg['cropping_cfg']["agent_center"])
-        # else:
-        #     agent_from_glraster[:2, 2] = -np.array([local_hist_pix[0, 0], local_hist_pix[0, 1]])
-        #
-        # agent_from_raster = pix_to_m @ agent_from_glraster
-        # agent_from_raster[2, 2] = 1
-        # raster_from_agent = np.eye(3) / self.cfg['SDD_scales'][file]["scale"]
-        # raster_from_agent[2, 2] = 1
-        #
-        # rotation_matrix = np.eye(3)
-        # if img is not None:
-        #     raster_from_agent[:2, 2] = np.array(self.cfg['cropping_cfg']["image_shape"]) * np.array(
-        #         self.cfg['cropping_cfg']["agent_center"])
-        # else:
-        #
-        #     angle = trajectory_orientation(local_hist_pix[0], local_hist_pix[1])
-        #     if agent_hist_avail[1] != 1:
-        #         angle = 0
-        #     rotation_matrix = np.array([[np.cos(angle), np.sin(angle), 0],
-        #                                 [-np.sin(angle), np.cos(angle), 0],
-        #                                 [0, 0, 1]])
-        #     agent_from_raster = rotation_matrix @ agent_from_raster
-        #     raster_from_agent = np.linalg.inv(agent_from_raster)
-        #
-        # agent_from_loraster = pix_to_m @ np.linalg.inv(raster_from_agent)
-        # agent_hist_localM = transform_points(local_hist_pix, agent_from_raster)
-        # neigh_localM = transform_points(local_neigh_pix, agent_from_raster)
-        # target_localM = transform_points(local_target_pix, agent_from_raster)
-        #
-        # world_from_agent = globPix_to_locraster @ raster_from_agent
-        # agent_from_world = pix_to_m @ globPix_to_locraster
-        # raster_from_world = raster_from_agent @ agent_from_world
-        # agent_hist_localM, neigh_localM = self.calc_speed_accel(agent_hist_localM, neigh_localM, agent_hist_avail,
-        #                                                         hist_avail)
-        res = [img.astype(np.uint8), mask.astype(np.uint8), agent_hist_localM, agent_hist_avail,target_localM, target_avil, neigh_localM,
+
+        agent_hist_localM = transform_points(agent_history[:, self.loader.coors_row],
+                                        # pix_to_m @ intermidiate_to_locraster @ transform)
+                                        agent_from_raster @ intermidiate_to_locraster @ transform)
+
+        neigh_localM = transform_points(time_sorted_hist[:, :, self.loader.coors_row],
+                                        # pix_to_m @ intermidiate_to_locraster @ transform) - agent_hist_M[0]
+                                        agent_from_raster @ intermidiate_to_locraster @ transform)
+        target_localM = transform_points(agent_future[:, self.loader.coors_row],
+                                         # pix_to_m @ intermidiate_to_locraster @ transform) - agent_hist_M[0]
+                                         agent_from_raster @ intermidiate_to_locraster @ transform)
+
+
+        res = [img.astype(np.uint8), mask, agent_hist_localM, agent_hist_avail, target_localM, target_avil, neigh_localM,
                hist_avail, np.linalg.inv(agent_from_raster), raster_from_world, world_from_agent, agent_from_world,
-               np.linalg.inv(globPix_to_locraster), transform_points(forces, rotation_matrix), map_to_local,
-               np.array([tl_y, tl_x, br_y, br_x])]
+               np.linalg.inv(pix_to_m) @ world_from_agent, transform_points(forces, rotation_matrix_cropped), rotation_matrix_cropped,
+               # np.array([tl_y, tl_x, br_y, br_x])]
+               np.array([tl_x_intermidiate, tl_y_intermidiate, br_x_intermidiate, br_y_intermidiate])]
         return res
 
 
@@ -598,63 +596,7 @@ class NeighboursHistory:
         return poses
 
 import time
-#
-# class UnifiedInterface:
-#     def __init__(self, data):
-#         st = time.time()
-#         if data[0]["img"] is None:
-#             self.image = None
-#         else:
-#             self.image = np.stack([np.array(data[i]["img"]) for i in range(len(data))], axis=0)
-#         self.segm = np.stack([np.array(data[i]["segm"]) for i in range(len(data))], axis=0)
-#         self.history_positions = np.stack([np.array(data[i]["agent_hist"]) for i in range(len(data))],
-#                                           axis=0)
-#         self.history_av = np.stack([np.array(data[i]["agent_hist_avail"]) for i in range(len(data))],
-#                                    axis=0)
-#
-#         try:
-#             self.forces = np.stack([np.array(data[i]["forces"]) for i in range(len(data))],
-#                                    axis=0)
-#         except:
-#             self.forces = None
-#         self.history_agents = NeighboursHistory([(data[i]["neighb"]) for i in range(len(data))]).get_history()
-#         self.history_agents_avail = [np.array(data[i]["neighb_avail"]) for i in range(len(data))]
-#         self.tgt = np.stack([np.array(data[i]["target"]) for i in range(len(data))], axis=0)
-#         self.tgt_avail = np.stack([np.array(data[i]["target_avil"]) for i in range(len(data))], axis=0)
-#         self.world_to_image = None  # torch.stack([torch.tensor(data[i]["world_to_image"]) for i in range(len(data))], dim=0)
-#         self.raster_from_agent = np.stack([np.array(data[i]["raster_from_agent"]) for i in range(len(data))],
-#                                           axis=0)
-#         self.raster_from_world = np.stack([np.array(data[i]["raster_from_world"]) for i in range(len(data))],
-#                                           axis=0)
-#         self.agent_from_world = np.stack([np.array(data[i]["agent_from_world"]) for i in range(len(data))],
-#                                          axis=0)
-#         self.world_from_agent = np.stack([np.array(data[i]["world_from_agent"]) for i in range(len(data))],
-#                                          axis=0)
-#
-#         self.loc_im_to_glob = np.stack([np.array(data[i]["loc_im_to_glob"]) for i in range(len(data))],
-#                                        axis=0)
-#         self.centroid = None
-#         self.extent = None
-#         self.yaw = None
-#         self.speed = None
-#         try:
-#             self.map_affine = np.stack([np.array(data[i]["map_affine"]) for i in range(len(data))],
-#                                        axis=0)
-#         except KeyError:
-#             self.map_affine = None
-#
-#         try:
-#             self.cropping_points = np.stack([np.array(data[i]["cropping_points"]) for i in range(len(data))],
-#                                             axis=0)
-#         except KeyError:
-#             self.cropping_points = None
-#         try:
-#             self.agent_ts_id = np.stack([np.array(data[i]["agent_ts_id"]) for i in range(len(data))],
-#                                        axis=0)
-#         except KeyError:
-#             self.agent_ts_id = None
-#         # print(time.time() - st)
-# #
+
 class UnifiedInterface:
     def __init__(self, data):
         # return None

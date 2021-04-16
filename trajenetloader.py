@@ -290,9 +290,10 @@ class TrajnetLoader:
 
             # img = Image.open(img_file)
             # img = np.asarray(img, dtype="int32")
-        if self.cfg["raster_params"]["use_segm"]:
-            return np.copy(self.loaded_imgs[img_file]), np.copy(self.loaded_imgs[segm_file]), self.img_transf[img_file]
-        else:
-            return np.copy(self.loaded_imgs[img_file]), None, self.img_transf[img_file]
+            if self.cfg["raster_params"]["use_segm"]:
+                return np.copy(self.loaded_imgs[img_file]), np.copy(self.loaded_imgs[segm_file]), self.img_transf[img_file]
+            else:
+                return np.copy(self.loaded_imgs[img_file]), None, self.img_transf[img_file]
+        return None, None, np.eye(3)
 
 

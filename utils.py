@@ -198,8 +198,8 @@ def crop_image(img, cfg, agent_center: np.array, pix_to_met, mask_pil):
 
     tl_pix = np.linalg.inv(pix_to_met) @ tl_meters
     br_pix = np.linalg.inv(pix_to_met) @ br_meters
-    assert np.allclose((br_meters[:2] - tl_meters[:2]),
-                       np.array([cfg["image_area_meters"][0], cfg["image_area_meters"][1]]))
+    # assert np.allclose((br_meters[:2] - tl_meters[:2]),
+    #                    np.array([cfg["image_area_meters"][0], cfg["image_area_meters"][1]]))
 
     # tl_x = max(0, agent_center[1] - cfg["agent_center"][1] * cfg["image_area_meters"][0] / pix_to_met[0,0])
     # tl_y = max(0, agent_center[0] - cfg["agent_center"][0] * cfg["image_area_meters"][1] / pix_to_met[0,0])
@@ -276,7 +276,7 @@ def sdd_crop_and_rotate(img: np.array, path, border_width=400, draw_traj=1, pix_
     # pix_to_meters from numpy_pix to meters =  (orig_im to meters)  @  (numpy_im to orig_image)
     pix_to_meters = pix_to_meters @ np.linalg.inv(transform)
 
-    crop_img, scale, crop_mask, (tl_y, tl_x, br_y, br_x) = crop_image(img, cropping_cfg,
+    crop_img, scale, crop_mask, (tl_y, tl_x, br_y, br_x) = crop_image(None, cropping_cfg,
                                                                       agent_center=agent_center,
                                                                       pix_to_met=pix_to_meters,
                                                                       mask_pil=mask)
