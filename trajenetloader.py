@@ -39,8 +39,8 @@ class TrajnetLoader:
         self.data_len = 0
         self.sub_data_len = [0]
         self.cfg = cfg
-        self.resize_datastes = {"SDD": 3, "ETH/UCY": 1}
-        self.border_datastes = {"SDD": 800, "ETH/UCY": 300}
+        self.resize_datastes = {"SDD": 8, "ETH/UCY": 1}
+        self.border_datastes = {"SDD": 1200, "ETH/UCY": 300}
         self.img_size = {"SDD": (int(2100/self.resize_datastes["SDD"]), int(2000/self.resize_datastes["SDD"])),
                          "ETH/UCY": (int(2100 / self.resize_datastes["ETH/UCY"]), int(2000 / self.resize_datastes["ETH/UCY"]))}
         self.loaded_imgs = {}

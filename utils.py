@@ -21,7 +21,7 @@ def preprocess_data(data, cfg, device="cpu") -> torch.tensor:
 
     mask_tensor = None
     if data.segm is not None:
-        mask_tensor = (torch.tensor(data.segm, device=device, dtype=torch.float32).unsqueeze(1)/255)
+        mask_tensor = (torch.tensor(data.segm.squeeze(), device=device, dtype=torch.float32).unsqueeze(1)/255)
         # imgs_tensor = torch.cat((imgs_tensor, mask_tensor), dim=1)
     bs = imgs_tensor.shape[0]
     cropping_points = data.cropping_points

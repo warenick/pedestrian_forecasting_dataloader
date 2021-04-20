@@ -14,10 +14,9 @@ draw_speeds = 0
 draw_targets = 1
 once = 1
 
-def visualize_test():
+def visualize_test(cfg):
     Rad = 2
-    cfg["raster_params"]["use_map"] = False
-    cfg["raster_params"]["normalize"] = True
+
     files = [
         "SDD/bookstore_0.txt"
     ]
@@ -27,7 +26,7 @@ def visualize_test():
     # path_to_save = "/home/robot/repos/SDD_forces/192_192_f_n/"
     torch.manual_seed(42)
     np.random.seed(42)
-    for i in tqdm(range(0, len(dataset))):
+    for i in tqdm(range(0, 10)):
         ind = int(np.random.rand() * len(dataset))
         data = dataset[ind]
         if cfg["raster_params"]["use_map"]:
@@ -35,9 +34,19 @@ def visualize_test():
                 img = cv2.warpAffine(data[0], data[14][:2, :], (data[0].shape[1], data[0].shape[0]))
                 img = img[int(data[15][1]):int(data[15][3]), int(data[15][0]):int(data[15][2])]
                 img = cv2.resize(img, (cfg["cropping_cfg"]["image_shape"][0], cfg["cropping_cfg"]["image_shape"][1]))
+                if cfg["raster_params"]["use_segm"]:
+                    mask = cv2.warpAffine(data[1], data[14][:2, :], (data[1].shape[1], data[1].shape[0]))
+                    mask = mask[int(data[15][1]):int(data[15][3]), int(data[15][0]):int(data[15][2])]
+                    mask = cv2.resize(mask,
+                                     (cfg["cropping_cfg"]["image_shape"][0], cfg["cropping_cfg"]["image_shape"][1]))
+                    mask_img = Image.fromarray(np.asarray(mask, dtype="uint8"))
             else:
                 img = data[0]
+                if cfg["raster_params"]["use_segm"]:
+                    mask = data[1][:,:,0]
+                    mask_img = Image.fromarray(np.asarray(mask, dtype="uint8"))
             img = Image.fromarray(np.asarray(img, dtype="uint8"))
+
             draw = ImageDraw.Draw(img)
             if data[3][1] == 0:
                 continue
@@ -83,18 +92,57 @@ def visualize_test():
                             (pose_raster[0] - Rad, pose_raster[1] - Rad, pose_raster[0] + Rad, pose_raster[1] + Rad),
                             fill='#33cc33', outline='#33cc33')
             img.save("test/"+str(i)+".jpg")
-        # pix_path = torch.einsum("bki, bji-> bjk", torch.tensor(data.loc_im_to_glob @ data.raster_from_agent).float(),
-        #                         path_.float())
-        # print()
+            if cfg["raster_params"]["use_segm"]:
+                mask_img.save("test/" + str(i) + "mask.jpg")
+
+
 if __name__ == "__main__":
     from train_test_split import get_train_val_dataloaders
     from dataloader import  collate_wrapper
     import numpy as np
 
-    visualize_test()
+
+
+    # cfg["raster_params"]["use_map"] = True
+    # cfg["raster_params"]["normalize"] = False
+    # cfg["raster_params"]["use_segm"] = False
+    # visualize_test(cfg)
+    #
+    # cfg["raster_params"]["use_map"] = True
+    # cfg["raster_params"]["normalize"] = False
+    # cfg["raster_params"]["use_segm"] = True
+    # visualize_test(cfg)
+    # cfg["raster_params"]["use_map"] = True
+    # cfg["raster_params"]["normalize"] = True
+    # cfg["raster_params"]["use_segm"] = False
+    # visualize_test(cfg)
+
     cfg["raster_params"]["use_map"] = True
     cfg["raster_params"]["normalize"] = True
+    cfg["raster_params"]["use_segm"] = True
+    visualize_test(cfg)
+
+
+
+    cfg["raster_params"]["use_map"] = False
+    cfg["raster_params"]["normalize"] = True
     cfg["raster_params"]["use_segm"] = False
+    visualize_test(cfg)
+    cfg["raster_params"]["use_map"] = False
+    cfg["raster_params"]["normalize"] = True
+    cfg["raster_params"]["use_segm"] = True
+    visualize_test(cfg)
+    cfg["raster_params"]["use_map"] = False
+    cfg["raster_params"]["normalize"] = False
+    cfg["raster_params"]["use_segm"] = False
+    visualize_test(cfg)
+
+    cfg["raster_params"]["use_map"] = False
+    cfg["raster_params"]["normalize"] = False
+    cfg["raster_params"]["use_segm"] = True
+    visualize_test(cfg)
+
+
 
     # path_ = "/media/robot/hdd1/hdd_repos/pedestrian_forecasting_dataloader/data/train/"
     path_ = "/media/robot/hdd1/hdd_repos/pedestrian_forecasting_dataloader/data/train/"
@@ -102,11 +150,14 @@ if __name__ == "__main__":
         "SDD"
     ]
 
+    cfg["raster_params"]["use_map"] = True
+    cfg["raster_params"]["normalize"] = True
+    cfg["raster_params"]["use_segm"] = True
     for val_file in files:
         train_ds, val_ds = get_train_val_dataloaders(path_, cfg, val_file, False)
         from torch.utils.data import DataLoader
         train_dataloader = DataLoader(train_ds, batch_size=256,
-                                      shuffle=True, num_workers=0, collate_fn=collate_wrapper, pin_memory=True)
+                                      shuffle=True, num_workers=8, collate_fn=collate_wrapper, pin_memory=True)
         val_dataloader = DataLoader(val_ds, batch_size=256,
                                     shuffle=False, num_workers=0, collate_fn=collate_wrapper)
 
@@ -120,7 +171,7 @@ if __name__ == "__main__":
             imgs, masks = preprocess_data(data, cfg, "cuda")
             # print(time.time() - st)
 
-            if num>=50:
+            if num >= 50:
                 exit()
         for num,data in enumerate(tqdm(val_dataloader)):
             val_poses = np.concatenate((val_poses, data.history_positions[:,:,:2][data.history_av != 0].reshape(-1,2)))
