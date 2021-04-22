@@ -2,8 +2,10 @@ import numpy as np
 from tqdm import tqdm
 import cv2
 import matplotlib.pyplot as plt
-from transformations import Resize, AddBorder
-
+try:
+    from transformations import Resize, AddBorder
+except:
+    from .transformations import Resize, AddBorder
 
 
 class TrajnetLoader:
@@ -39,15 +41,15 @@ class TrajnetLoader:
         self.data_len = 0
         self.sub_data_len = [0]
         self.cfg = cfg
-        self.resize_datastes = {"SDD": 8, "ETH/UCY": 1}
-        self.border_datastes = {"SDD": 1200, "ETH/UCY": 300}
+        self.resize_datastes = {"SDD": 10, "ETH/UCY": 1}
+        self.border_datastes = {"SDD": 1600, "ETH/UCY": 300}
         self.img_size = {"SDD": (int(2100/self.resize_datastes["SDD"]), int(2000/self.resize_datastes["SDD"])),
                          "ETH/UCY": (int(2100 / self.resize_datastes["ETH/UCY"]), int(2000 / self.resize_datastes["ETH/UCY"]))}
         self.loaded_imgs = {}
         self.img_transf = {}
-        print("loading files")
+        # print("loading files")
 
-        for file in tqdm(data_files):
+        for file in (data_files):
             dataset = "ETH/UCY"
             if path[-1] != "/":
                 path += "/"

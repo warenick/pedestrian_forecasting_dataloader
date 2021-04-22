@@ -14,7 +14,7 @@ draw_speeds = 0
 draw_targets = 1
 once = 1
 
-def visualize_test(cfg):
+def visualize_test(cfg, name=""):
     Rad = 2
 
     files = [
@@ -26,7 +26,7 @@ def visualize_test(cfg):
     # path_to_save = "/home/robot/repos/SDD_forces/192_192_f_n/"
     torch.manual_seed(42)
     np.random.seed(42)
-    for i in tqdm(range(0, 10)):
+    for i in tqdm(range(0, 20)):
         ind = int(np.random.rand() * len(dataset))
         data = dataset[ind]
         if cfg["raster_params"]["use_map"]:
@@ -91,57 +91,60 @@ def visualize_test(cfg):
                         draw.ellipse(
                             (pose_raster[0] - Rad, pose_raster[1] - Rad, pose_raster[0] + Rad, pose_raster[1] + Rad),
                             fill='#33cc33', outline='#33cc33')
-            img.save("test/"+str(i)+".jpg")
+            img.save("test/"+ name +str(i)+".jpg")
             if cfg["raster_params"]["use_segm"]:
-                mask_img.save("test/" + str(i) + "mask.jpg")
+                mask_img.save("test/"+ name + str(i) + "mask.jpg")
 
 
 if __name__ == "__main__":
     from train_test_split import get_train_val_dataloaders
     from dataloader import  collate_wrapper
     import numpy as np
+    if 1:
+        cfg["raster_params"]["use_map"] = True
+        cfg["raster_params"]["normalize"] = True
+        cfg["raster_params"]["use_segm"] = True
+        visualize_test(cfg, "nm")
+
+        cfg["raster_params"]["use_map"] = True
+        cfg["raster_params"]["normalize"] = False
+        cfg["raster_params"]["use_segm"] = False
+        visualize_test(cfg, "fmap")
+
+        cfg["raster_params"]["use_map"] = True
+        cfg["raster_params"]["normalize"] = False
+        cfg["raster_params"]["use_segm"] = True
+        visualize_test(cfg, "fmask")
+        cfg["raster_params"]["use_map"] = True
+        cfg["raster_params"]["normalize"] = True
+        cfg["raster_params"]["use_segm"] = False
+        visualize_test(cfg, "nomask")
+
+        cfg["raster_params"]["use_map"] = True
+        cfg["raster_params"]["normalize"] = True
+        cfg["raster_params"]["use_segm"] = True
+        visualize_test(cfg, "nm")
 
 
 
-    # cfg["raster_params"]["use_map"] = True
-    # cfg["raster_params"]["normalize"] = False
-    # cfg["raster_params"]["use_segm"] = False
-    # visualize_test(cfg)
-    #
-    # cfg["raster_params"]["use_map"] = True
-    # cfg["raster_params"]["normalize"] = False
-    # cfg["raster_params"]["use_segm"] = True
-    # visualize_test(cfg)
-    # cfg["raster_params"]["use_map"] = True
-    # cfg["raster_params"]["normalize"] = True
-    # cfg["raster_params"]["use_segm"] = False
-    # visualize_test(cfg)
+        cfg["raster_params"]["use_map"] = False
+        cfg["raster_params"]["normalize"] = True
+        cfg["raster_params"]["use_segm"] = False
+        visualize_test(cfg)
+        cfg["raster_params"]["use_map"] = False
+        cfg["raster_params"]["normalize"] = True
+        cfg["raster_params"]["use_segm"] = True
+        visualize_test(cfg)
+        cfg["raster_params"]["use_map"] = False
+        cfg["raster_params"]["normalize"] = False
+        cfg["raster_params"]["use_segm"] = False
+        visualize_test(cfg)
 
-    cfg["raster_params"]["use_map"] = True
-    cfg["raster_params"]["normalize"] = True
-    cfg["raster_params"]["use_segm"] = True
-    visualize_test(cfg)
-
-
-
-    cfg["raster_params"]["use_map"] = False
-    cfg["raster_params"]["normalize"] = True
-    cfg["raster_params"]["use_segm"] = False
-    visualize_test(cfg)
-    cfg["raster_params"]["use_map"] = False
-    cfg["raster_params"]["normalize"] = True
-    cfg["raster_params"]["use_segm"] = True
-    visualize_test(cfg)
-    cfg["raster_params"]["use_map"] = False
-    cfg["raster_params"]["normalize"] = False
-    cfg["raster_params"]["use_segm"] = False
-    visualize_test(cfg)
-
-    cfg["raster_params"]["use_map"] = False
-    cfg["raster_params"]["normalize"] = False
-    cfg["raster_params"]["use_segm"] = True
-    visualize_test(cfg)
-
+        cfg["raster_params"]["use_map"] = False
+        cfg["raster_params"]["normalize"] = False
+        cfg["raster_params"]["use_segm"] = True
+        visualize_test(cfg)
+        exit()
 
 
     # path_ = "/media/robot/hdd1/hdd_repos/pedestrian_forecasting_dataloader/data/train/"

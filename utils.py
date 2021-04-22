@@ -14,7 +14,10 @@ except:
     from .config import SDD_scales, cropping_cfg
 import kornia
 import cv2
-from transformations import Rotate, Crop
+try:
+    from transformations import Resize, AddBorder, Rotate, Crop
+except:
+    from .transformations import Resize, AddBorder, Rotate, Crop
 
 def preprocess_data(data, cfg, device="cpu") -> torch.tensor:
     imgs_tensor = (torch.tensor(data.image, device=device, dtype=torch.float32).permute(0, 3, 1, 2))/255
@@ -306,11 +309,11 @@ def expand(border, img, mask):
 
 def draw_h(draw_traj, img, path, transform):
     if draw_traj:
-        R = 5
+        R = 1
         for pose in path:
             if np.linalg.norm(pose - np.array([-1., -1.])) > 1e-6:
                 new_pose = transform @ np.array([pose[0], pose[1], 1])
-                cv2.circle(img, (int(new_pose[0]), int(new_pose[1])), R, (0, 0, 255), 1)
+                cv2.circle(img, (int(new_pose[0]), int(new_pose[1])), R, (0, 0, 255), -1)
 
 
 def vis_pdf(image, distrib, transform_from_pix_to_m):

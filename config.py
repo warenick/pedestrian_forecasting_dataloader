@@ -332,7 +332,7 @@ eth_hotel_cfg = {"scale": np.array([[1.1048200e-02,   6.6958900e-04,  -3.3295300
 
 cropping_cfg = {
     "agent_center": [0.25, 0.5],
-    "image_area_meters": [30, 30],
+    "image_area_meters": [25, 25],
     "image_shape": [112, 112],
 }
 
@@ -345,7 +345,7 @@ cfg = {
         "draw_hist": True,
         "use_map": True,
         "normalize": True,
-        "use_segm": True,
+        "use_segm": False,
         # 'raster_size': [224, 224],
         # 'pixel_size': [0.5, 0.5],
         # 'ego_center': [0.25, 0.5],
