@@ -54,6 +54,7 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         dataset_index = self.loader.get_subdataset_ts_separator(index)
         file = self.files[dataset_index]
         ped_id, ts = self.loader.get_pedId_and_timestamp_by_index(dataset_index, index)
+        # print(ped_id)
         indexes = self.loader.get_all_agents_with_timestamp(dataset_index, ts)
         agents_history = self.loader.get_agent_history(dataset_index, ped_id, ts, indexes)
         agents_future = self.loader.get_agent_future(dataset_index, ped_id, ts, indexes)
@@ -448,6 +449,7 @@ class DatasetFromTxt(torch.utils.data.Dataset):
                 #        "agent_from_world": agent_from_world,
                 #        "forces": forces,
                 #        }
+            res.append(file)
             return res
 
     def calc_speed_accel(self, agent_history, neigh_localM, agent_history_av, neigh_localM_av):
@@ -487,7 +489,8 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         tl_y, tl_x, br_y, br_x = (0, 0, 0, 0)
         map_to_local = None
         if img is None:
-            pass
+
+            scale = np.eye(3)
         else:
             img, globPix_to_locraster, scale,\
             mask, map_to_local,\
@@ -498,19 +501,21 @@ class DatasetFromTxt(torch.utils.data.Dataset):
                                                                    cropping_cfg=self.cfg['cropping_cfg'], file=file,
                                                                    mask=mask,
                                                                    scale_factor=self.loader.resize_datastes["SDD"],
-                                                                   transform=transform)
+                                                                   transform=transform, neighb_hist=time_sorted_hist,
+                                                                   neighb_hist_avail=hist_avail)
 
         import cv2
 
         ###
         agent_center_intermidiate = transform @ np.append(agent_history[:, 2:][0], 1)
-
+        scale_ = self.cfg['SDD_scales'][file]["scale"]
+        pix_to_meters = (np.eye(3) * scale_)
         radius = np.sqrt(2) * (round(
             max(np.linalg.norm((transform @ np.append(agent_history[:, 2:][0], 1))[:2] - np.array([tl_x, tl_y])),
                 np.linalg.norm((transform @ np.append(agent_history[:, 2:][0], 1))[:2] - np.array([br_x, br_y])))))
 
-        img = img[int(agent_center_intermidiate[1] - radius): int(agent_center_intermidiate[1] + radius),
-                  int(agent_center_intermidiate[0] - radius): int(agent_center_intermidiate[0] + radius)]
+        img_ = img[int(agent_center_intermidiate[1] - radius): int(agent_center_intermidiate[1] + radius),
+              int(agent_center_intermidiate[0] - radius): int(agent_center_intermidiate[0] + radius)]
         if mask is not None:
             mask = mask[int(agent_center_intermidiate[1] - radius): int(agent_center_intermidiate[1] + radius),
                       int(agent_center_intermidiate[0] - radius): int(agent_center_intermidiate[0] + radius)]
@@ -520,10 +525,12 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         br_x_intermidiate = br_x - (agent_center_intermidiate[0] - radius)
 
         # TODO: depend at pic size in meters!
-        img_size = (int(1.6*self.loader.img_size["SDD"][0]), int(1.6*self.loader.img_size["SDD"][1]))
+        size_constant = self.cfg["cropping_cfg"]["image_area_meters"][0]*0.08
+        img_size = (int(size_constant*self.loader.img_size["SDD"][0]), int(size_constant*self.loader.img_size["SDD"][1]))
         new_im = np.zeros((img_size[0], img_size[1], 3), dtype=np.uint8)
-        new_im[:img.shape[0], :img.shape[1]] = np.copy(img)
+        new_im[:img_.shape[0], :img_.shape[1]] = np.copy(img_)
         img = new_im
+        del img_
         co_operator = ChangeOrigin(new_origin=((agent_center_intermidiate[0] - radius, agent_center_intermidiate[1] - radius)), rotation=np.eye(2))
         rotation_matrix_cropped = co_operator.transformation_matrix @ rotation_matrix @ np.linalg.inv(co_operator.transformation_matrix)
 

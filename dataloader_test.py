@@ -14,21 +14,47 @@ draw_speeds = 0
 draw_targets = 1
 once = 1
 
+
+
+files_all = ["SDD/bookstore_0.txt", "SDD/bookstore_1.txt", "SDD/bookstore_2.txt", "SDD/bookstore_3.txt",
+                 "SDD/bookstore_4.txt", "SDD/bookstore_5.txt", "SDD/bookstore_6.txt",
+                 "SDD/coupa_0.txt", "SDD/coupa_2.txt", "SDD/coupa_3.txt",
+                 "SDD/deathCircle_0.txt", "SDD/deathCircle_1.txt", "SDD/deathCircle_2.txt", "SDD/deathCircle_3.txt",
+                 "SDD/deathCircle_4.txt",
+                 "SDD/gates_0.txt", "SDD/gates_1.txt", "SDD/gates_2.txt", "SDD/gates_3.txt", "SDD/gates_4.txt",
+                 "SDD/gates_5.txt",  "SDD/gates_7.txt", "SDD/gates_8.txt",
+                 "SDD/hyang_0.txt", "SDD/hyang_1.txt", "SDD/hyang_2.txt", "SDD/hyang_3.txt", "SDD/hyang_4.txt",
+                 "SDD/hyang_5.txt", "SDD/hyang_6.txt", "SDD/hyang_7.txt", "SDD/hyang_8.txt", "SDD/hyang_9.txt",
+                 "SDD/hyang_10.txt", "SDD/hyang_11.txt",
+                 "SDD/hyang_12.txt", "SDD/hyang_13.txt", "SDD/hyang_14.txt",
+                 "SDD/little_0.txt", "SDD/little_2.txt", "SDD/little_3.txt",
+                 "SDD/nexus_0.txt", "SDD/nexus_2.txt", "SDD/nexus_3.txt", "SDD/nexus_4.txt",
+                 "SDD/nexus_5.txt", "SDD/nexus_6.txt", "SDD/nexus_7.txt", "SDD/nexus_8.txt", "SDD/nexus_9.txt",
+                 "SDD/nexus_10.txt", "SDD/nexus_11.txt",
+                 ]
+
 def visualize_test(cfg, name=""):
     Rad = 2
 
-    files = [
-        "SDD/bookstore_0.txt"
-    ]
+    # files = ["SDD/hyang_13.txt",
+    #     # "SDD/bookstore_0.txt"
+    # ]
     path_ = "/media/robot/hdd1/hdd_repos/pedestrian_forecasting_dataloader/data/train/"
     
-    dataset = DatasetFromTxt(path_, files, cfg)
+
     # path_to_save = "/home/robot/repos/SDD_forces/192_192_f_n/"
     torch.manual_seed(42)
     np.random.seed(42)
-    for i in tqdm(range(0, 20)):
+    cfg["cropping_cfg"]["image_area_meters"] = [35, 35]
+    for i in tqdm(range(0, 2000)):
+        file_index = np.random.randint(0, len(files_all))
+        files = [files_all[file_index]]
+        dataset = DatasetFromTxt(path_, files, cfg)
         ind = int(np.random.rand() * len(dataset))
         data = dataset[ind]
+        orig_img_path = path_ +"/"+  data[-1]
+        orig_img_path = orig_img_path[:orig_img_path.index(".")] + ".jpg"
+        orig_img = cv2.imread(orig_img_path)
         if cfg["raster_params"]["use_map"]:
             if cfg["raster_params"]["normalize"]:
                 img = cv2.warpAffine(data[0], data[14][:2, :], (data[0].shape[1], data[0].shape[0]))
@@ -46,8 +72,9 @@ def visualize_test(cfg, name=""):
                     mask = data[1][:,:,0]
                     mask_img = Image.fromarray(np.asarray(mask, dtype="uint8"))
             img = Image.fromarray(np.asarray(img, dtype="uint8"))
-
+            orig_img = Image.fromarray(np.asarray(orig_img, dtype="uint8"))
             draw = ImageDraw.Draw(img)
+            orig_img_draw = ImageDraw.Draw(orig_img)
             if data[3][1] == 0:
                 continue
             if draw_a_h:
@@ -57,6 +84,10 @@ def visualize_test(cfg, name=""):
                         pose_raster = data[8] @ np.array([pose[0], pose[1], 1.])
                         draw.ellipse(
                             (pose_raster[0] - Rad, pose_raster[1] - Rad, pose_raster[0] + Rad, pose_raster[1] + Rad),
+                            fill='red', outline='red')
+                        pose_img = data[12] @ data[8] @ np.array([pose[0], pose[1], 1.])
+                        orig_img_draw.ellipse(
+                            (pose_img[0] - Rad, pose_img[1] - Rad, pose_img[0] + Rad, pose_img[1] + Rad),
                             fill='red', outline='red')
                         # if num == 0:
                         if draw_speeds:
@@ -81,6 +112,10 @@ def visualize_test(cfg, name=""):
                             draw.ellipse(
                                 (pose_raster[0] - Rad, pose_raster[1] - Rad, pose_raster[0] + Rad, pose_raster[1] + Rad),
                                 fill=rgb, outline='#ffcc99')
+                            pose_img = data[12] @ data[8] @ np.array([pose[0], pose[1], 1.])
+                            orig_img_draw.ellipse(
+                                (pose_img[0] - Rad, pose_img[1] - Rad, pose_img[0] + Rad, pose_img[1] + Rad),
+                                fill=rgb, outline='#ffcc99')
 
             if draw_targets:
                 for num, pose in enumerate(data[4]):
@@ -91,7 +126,12 @@ def visualize_test(cfg, name=""):
                         draw.ellipse(
                             (pose_raster[0] - Rad, pose_raster[1] - Rad, pose_raster[0] + Rad, pose_raster[1] + Rad),
                             fill='#33cc33', outline='#33cc33')
+                        pose_img = data[12] @ data[8] @ np.array([pose[0], pose[1], 1.])
+                        orig_img_draw.ellipse(
+                            (pose_img[0] - Rad, pose_img[1] - Rad, pose_img[0] + Rad, pose_img[1] + Rad),
+                            fill='#33cc33', outline='#33cc33')
             img.save("test/"+ name +str(i)+".jpg")
+            orig_img.save(("test/orig_"+ name +str(i)+".jpg"))
             if cfg["raster_params"]["use_segm"]:
                 mask_img.save("test/"+ name + str(i) + "mask.jpg")
 
@@ -105,7 +145,7 @@ if __name__ == "__main__":
         cfg["raster_params"]["normalize"] = True
         cfg["raster_params"]["use_segm"] = True
         visualize_test(cfg, "nm")
-
+        exit()
         cfg["raster_params"]["use_map"] = True
         cfg["raster_params"]["normalize"] = False
         cfg["raster_params"]["use_segm"] = False

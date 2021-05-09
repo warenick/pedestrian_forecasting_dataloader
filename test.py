@@ -13,9 +13,22 @@ import numpy as np
 torch.manual_seed(46)
 np.random.seed(46)
 
-files = [
-        "SDD/nexus_9.txt"
-        ]
+files_all = ["SDD/bookstore_0.txt", "SDD/bookstore_1.txt", "SDD/bookstore_2.txt", "SDD/bookstore_3.txt",
+                 "SDD/bookstore_4.txt", "SDD/bookstore_5.txt", "SDD/bookstore_6.txt",
+                 "SDD/coupa_0.txt", "SDD/coupa_2.txt", "SDD/coupa_3.txt",
+                 "SDD/deathCircle_0.txt", "SDD/deathCircle_1.txt", "SDD/deathCircle_2.txt", "SDD/deathCircle_3.txt",
+                 "SDD/deathCircle_4.txt",
+                 "SDD/gates_0.txt", "SDD/gates_1.txt", "SDD/gates_2.txt", "SDD/gates_3.txt", "SDD/gates_4.txt",
+                 "SDD/gates_5.txt",  "SDD/gates_7.txt", "SDD/gates_8.txt",
+                 "SDD/hyang_0.txt", "SDD/hyang_1.txt", "SDD/hyang_2.txt", "SDD/hyang_3.txt", "SDD/hyang_4.txt",
+                 "SDD/hyang_5.txt", "SDD/hyang_6.txt", "SDD/hyang_7.txt", "SDD/hyang_8.txt", "SDD/hyang_9.txt",
+                 "SDD/hyang_10.txt", "SDD/hyang_11.txt",
+                 "SDD/hyang_12.txt", "SDD/hyang_13.txt", "SDD/hyang_14.txt",
+                 "SDD/little_0.txt", "SDD/little_2.txt", "SDD/little_3.txt",
+                 "SDD/nexus_0.txt", "SDD/nexus_2.txt", "SDD/nexus_3.txt", "SDD/nexus_4.txt",
+                 "SDD/nexus_5.txt", "SDD/nexus_6.txt", "SDD/nexus_7.txt", "SDD/nexus_8.txt", "SDD/nexus_9.txt",
+                 "SDD/nexus_10.txt", "SDD/nexus_11.txt",
+                 ]
 path_ = "/media/robot/hdd1/hdd_repos/pedestrian_forecasting_dataloader/data/train/"
 
 def test_img_area_local_meters():
@@ -23,9 +36,11 @@ def test_img_area_local_meters():
     cfg["raster_params"]["normalize"] = True
     cfg["raster_params"]["use_segm"] = True
 
-    cfg["cropping_cfg"]["image_area_meters"] = [20, 20]
-    dataset = DatasetFromTxt(path_, files, cfg)
     for i in range(30):
+        file_index = np.random.randint(0, len(files_all))
+        files = [files_all[file_index]]
+        cfg["cropping_cfg"]["image_area_meters"] = [20, 20]
+        dataset = DatasetFromTxt(path_, files, cfg)
         ind = int(np.random.rand() * len(dataset))
         data = dataset[ind]
         init_path = data[2].copy()
@@ -55,6 +70,8 @@ def test_img_area_global_pix():
 
     for i in range(30):
         cfg["cropping_cfg"]["image_area_meters"] = [20, 20]
+        file_index = np.random.randint(0, len(files_all))
+        files = [files_all[file_index]]
         dataset = DatasetFromTxt(path_, files, cfg)
         ind = int(np.random.rand() * len(dataset))
         data = dataset[ind]
@@ -83,8 +100,10 @@ def test_pix_to_m():
     cfg["raster_params"]["use_segm"] = True
 
     cfg["cropping_cfg"]["image_area_meters"] = [20, 20]
-    dataset = DatasetFromTxt(path_, files, cfg)
     for i in range(30):
+        file_index = np.random.randint(0, len(files_all))
+        files = [files_all[file_index]]
+        dataset = DatasetFromTxt(path_, files, cfg)
         ind = int(np.random.rand() * len(dataset))
         data = dataset[ind]
         init_path = data[2].copy()
@@ -118,8 +137,10 @@ def test_img_area_local_meters_no_mask():
 
 
     cfg["cropping_cfg"]["image_area_meters"] = [20, 20]
-    dataset = DatasetFromTxt(path_, files, cfg)
     for i in range(30):
+        file_index = np.random.randint(0, len(files_all))
+        files = [files_all[file_index]]
+        dataset = DatasetFromTxt(path_, files, cfg)
         ind = int(np.random.rand() * len(dataset))
         data = dataset[ind]
         init_path = data[2].copy()
@@ -149,6 +170,8 @@ def test_img_area_global_pix_no_mask():
 
     for i in range(30):
         cfg["cropping_cfg"]["image_area_meters"] = [20, 20]
+        file_index = np.random.randint(0, len(files_all))
+        files = [files_all[file_index]]
         dataset = DatasetFromTxt(path_, files, cfg)
         # path_to_save = "/home/robot/repos/SDD_forces/192_192_f_n/"
         ind = int(np.random.rand() * len(dataset))
@@ -180,6 +203,8 @@ def test_img_area_local_meters_no_norm():
     cfg["raster_params"]["use_segm"] = False
 
     cfg["cropping_cfg"]["image_area_meters"] = [20, 20]
+    file_index = np.random.randint(0, len(files_all))
+    files = [files_all[file_index]]
     dataset = DatasetFromTxt(path_, files, cfg)
     for i in range(30):
         ind = int(np.random.rand() * len(dataset))
@@ -207,6 +232,8 @@ def test_img_area_global_pix_no_norm():
 
     for i in range(30):
         cfg["cropping_cfg"]["image_area_meters"] = [20, 20]
+        file_index = np.random.randint(0, len(files_all))
+        files = [files_all[file_index]]
         dataset = DatasetFromTxt(path_, files, cfg)
         # path_to_save = "/home/robot/repos/SDD_forces/192_192_f_n/"
         ind = int(np.random.rand() * len(dataset))

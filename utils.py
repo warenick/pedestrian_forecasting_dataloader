@@ -249,7 +249,8 @@ def calc_transform_matrix(init_coord, angle, scale, output_shape: List):
 
 
 def sdd_crop_and_rotate(img: np.array, path, border_width=400, draw_traj=1, pix_to_m_cfg=SDD_scales,
-                        cropping_cfg=cropping_cfg, file=None, mask=None, scale_factor=1, transform=None):
+                        cropping_cfg=cropping_cfg, file=None, mask=None, scale_factor=1, transform=None, neighb_hist=None,
+                        neighb_hist_avail=None):
     # print(img.dtype)
     # img_pil = Image.fromarray(np.asarray(img, dtype="uint8"))
     # mask_pil = Image.fromarray(np.asarray(mask, dtype="uint8"))
@@ -257,8 +258,8 @@ def sdd_crop_and_rotate(img: np.array, path, border_width=400, draw_traj=1, pix_
     # scale_factor = 2
     scaled_border = border_width // scale_factor
 
-    scale = pix_to_m_cfg[file]["scale"]
-    draw_h(draw_traj, img, path, transform)
+
+    draw_h(draw_traj, img, path, transform, neighb_hist[:,:,2:], neighb_hist_avail)
     # img_b, mask_b = expand(border, img, mask)
     # mask_pil = ImageOps.expand(mask_pil, (border, border))
 
@@ -272,6 +273,7 @@ def sdd_crop_and_rotate(img: np.array, path, border_width=400, draw_traj=1, pix_
     tm = rotate_operator.transformation_matrix
 
     # scale -> from image_pix (original) to meters
+    scale = pix_to_m_cfg[file]["scale"]
     pix_to_meters = (np.eye(3) * scale)
     pix_to_meters[2, 2] = 1
     # transform -> from image to numpy
@@ -279,7 +281,7 @@ def sdd_crop_and_rotate(img: np.array, path, border_width=400, draw_traj=1, pix_
     # pix_to_meters from numpy_pix to meters =  (orig_im to meters)  @  (numpy_im to orig_image)
     pix_to_meters = pix_to_meters @ np.linalg.inv(transform)
 
-    crop_img, scale, crop_mask, (tl_y, tl_x, br_y, br_x) = crop_image(None, cropping_cfg,
+    crop_img, scale, crop_mask, (tl_y, tl_x, br_y, br_x) = crop_image(img, cropping_cfg,
                                                                       agent_center=agent_center,
                                                                       pix_to_met=pix_to_meters,
                                                                       mask_pil=mask)
@@ -307,13 +309,19 @@ def expand(border, img, mask):
     return img_b, mask_b
 
 
-def draw_h(draw_traj, img, path, transform):
+def draw_h(draw_traj, img, path, transform, neighb_hist=None, neighb_hist_avail=None):
     if draw_traj:
         R = 1
         for pose in path:
             if np.linalg.norm(pose - np.array([-1., -1.])) > 1e-6:
                 new_pose = transform @ np.array([pose[0], pose[1], 1])
                 cv2.circle(img, (int(new_pose[0]), int(new_pose[1])), R, (0, 0, 255), -1)
+        if neighb_hist is not None:
+            for ped_id, ped in enumerate(neighb_hist):
+                for ts, pose in enumerate(ped):
+                    if neighb_hist_avail[ped_id, ts]:
+                        new_pose = transform @ np.array([pose[0], pose[1], 1])
+                        cv2.circle(img, (int(new_pose[0]), int(new_pose[1])), R, (0, int(205*((ts+1))/8), int(155*((ts+1))/8)), -1)
 
 
 def vis_pdf(image, distrib, transform_from_pix_to_m):
