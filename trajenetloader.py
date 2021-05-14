@@ -56,21 +56,28 @@ class TrajnetLoader:
             if "SDD" in file:
                 dataset = "SDD"
                 try:
-
                     new_name = name[:name.index(".")] + ".npy"
                     self.data[file] = np.load(new_name).astype(np.float32)
 
                 except:
-                    self.data[file] = np.loadtxt(path + "/" + file, delimiter=' ', usecols=[0, 1, 2, 3, 4, 5]).astype(np.float32)
+                    self.data[file] = np.loadtxt(path + "/" + file, delimiter=' ', usecols=[0, 1, 2, 3, 4, 5, 6]).astype(np.float32)
+                    self.data[file] = self.data[file][self.data[file][:, 6] == 0]
+                    # new_name = name[:name.index(".")] + ".npy"
+                    # np.save(new_name, self.data[file])
+                    # print("saving to ", new_name)
 
+                # filter each 12th data point (to be 0.4 fps)
                 self.data[file] = self.data[file][
                     (self.data[file][:, 5] + (self.data[file][:, 5].min() % 12)) % 12 == 0]
+                # ts, ped_id, bboxes
                 self.data[file] = self.data[file][:, (5, 0, 1, 2, 3, 4)]
+                # ts, ped_id, pose
                 self.data[file][:, 2] = (self.data[file][:, 2] + self.data[file][:, 4]) / 2
                 self.data[file][:, 3] = (self.data[file][:, 3] + self.data[file][:, 5]) / 2
 
 
                 self.data[file] = self.data[file][:, :4]
+
             else:
                 self.data[file] = np.genfromtxt(path + "/" + file, delimiter='').astype(np.float32)
             if cfg["raster_params"]["use_map"]:
