@@ -461,13 +461,25 @@ def vis_image_Aleksander(image, distr, raster_from_agent, tgt, index):
     pose_rasters = transform_points(means_meters, raster_from_agent)
     scale_raster_from_agent = raster_from_agent.clone()
     scale_raster_from_agent[:2, 2] = 0
-    covs = transform_points(cov_meters, raster_from_agent)
+    # covs = transform_points(transform_points(cov_meters, raster_from_agent))
+
+    if distr.mean.shape[0] == 1:
+        # mean_pix = torch.cat((distr.mean.detach(), torch.tensor([[0]])), dim=1)
+        mean_pix = transform_points(distr.mean.detach(), raster_from_agent)
+        image = cv2.ellipse(image.numpy(), ((int(mean_pix[0, 0]), int(mean_pix[0, 1])), (10, 10), 0),
+                    (220, 0, 150), thickness=-1)
+        image = torch.tensor(image)
+
+        # draw.ellipse()
     # for pose_raster, cov in zip(pose_rasters, covs):
     #     image = plot2dcov(image, pose_raster, cov)
-    image = vis_sigma_ellipses(image, pose_rasters, covs)
+    # image = vis_sigma_ellipses(image, pose_rasters, covs)
 
     dist_image = vis_pdf2(image, distr, raster_from_agent, index=index)
-    img_arr = heatmap2d_withiImg(dist_image, image)
+    cmap = plt.get_cmap('jet')
+    dist_image = cmap(2.5*dist_image.detach().numpy())
+    img_arr = torch.clamp(0.7*image/255 + 0.5 * dist_image[:, :, :3], max=1)
+    # img_arr = heatmap2d_withiImg(dist_image, image)
     return img_arr[:, :, :3]
 
 
