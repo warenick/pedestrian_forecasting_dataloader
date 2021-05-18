@@ -333,8 +333,9 @@ def vis_pdf(image, distrib, transform_from_pix_to_m):
     return dist_img
 
 
-def heatmap2d_withiImg(arr, img, filename=None):
+def heatmap2d_withiImg(arr, img, alpha1 = 1.0, alpha2 = 0.4,gamma = 0.0, filename=None):
     fig = plt.figure()
+    # return cv2.addWeighted(arr.permute(2,3,1).contiguous(), alpha1, img, alpha2, gamma)
     plt.imshow(img / 255, alpha=1)
     plt.imshow(arr.detach().cpu().numpy(), cmap='viridis', alpha=0.4)
     import io
@@ -372,14 +373,29 @@ def vis_pdf2(image, distrib, transform_from_pix_to_m, index):
 
 
 def vis_image_batched_Aleksander(images, distrs, raster_from_agent, goal_avail, tgt, num_to_vis=4):
+    '''
+    plot batch of multicomponent distribution on images
+
+    :params images: original 2d images  [bs,h,w,channel] channel=3
+    :params distr: torch.distributions.multivariate_normal.MultivariateNormal(  
+                        Categorical(probs: torch.Size([bs, num_distr]), logits: torch.Size([bs, num_distr])),
+                        MultivariateNormal(loc: torch.Size([bs, num_distr, 2]), covariance_matrix: torch.Size([bs, num_distr, 2, 2])))
+    :params raster_from_agent: transform matrix [bs,3,3]
+    :params goal_avail: mask of batc for plot [bs](bool)
+    :params tgt: optional points to drowing green circle
+    :params index: index of bs to visualise    
+    :params num_to_vis: count of img to be created
+
+    :return images: that function return original image with added visualisation distribution layer  [bs/num_to_vis,h,w,channel]
+    '''
     bs = images.shape[0]
     images = images.cpu().numpy()
     img = []
     for i in range(bs):
         if goal_avail[i]:
 
-            tgt_ = transform_points(tgt[i, -1:, :], raster_from_agent[i])
             try:
+                tgt_ = transform_points(tgt[i, -1:, :], raster_from_agent[i])
                 # cv2.ellipse((images[i] * 255).astype(np.uint8), center=(int(tgt_[0, 0]), int(tgt_[0, 1])), axes=(6, 6),
                 #             angle=0, startAngle=0, endAngle=360, color=(40, 240, 50), thickness=-1)
                 images[i] = cv2.ellipse(images[i].astype(np.float32).copy(), ((int(tgt_[0, 0]), int(tgt_[0, 1])), (6, 6), 0),
@@ -451,7 +467,20 @@ def plot2dcov(img, mu, Sigma, color='k', nSigmas=[1, 2, 3]):
     return np.asarray(pil_img, dtype="uint8")
 
 
-def vis_image_Aleksander(image, distr, raster_from_agent, tgt, index):
+def vis_image_Aleksander(image, distr, raster_from_agent, tgt = None,  index = 0):
+    '''
+    plot multicomponent distribution on image
+
+    :params image: original 2d image  [h,w,channel] channel=3
+    :params distr: torch.distributions.multivariate_normal.MultivariateNormal(  
+                        Categorical(probs: torch.Size([bs, num_distr]), logits: torch.Size([bs, num_distr])),
+                        MultivariateNormal(loc: torch.Size([bs, num_distr, 2]), covariance_matrix: torch.Size([bs, num_distr, 2, 2])))
+    :params raster_from_agent: transform matrix [3,3]
+    :params tgt: optional hz
+    :params index: index of bs to visualise    
+
+    :return image: that function return original image with added visualisation distribution layer  
+    '''
     try:
         means_meters = distr.component_distribution.mean.detach().cpu().numpy()[index]
         cov_meters = distr.component_distribution.covariance_matrix.detach().cpu().numpy()[index]
@@ -484,9 +513,33 @@ def vis_image_Aleksander(image, distr, raster_from_agent, tgt, index):
 
 
 if __name__ == '__main__':
-    image = torch.rand((224, 224, 3), dtype=torch.float)
-    transform_from_pix_to_m = torch.eye(3)
-    distr = torch.distributions.multivariate_normal.MultivariateNormal(torch.rand(2) + 100, torch.eye(2) * 50)
-    img_arr = vis_image_Aleksander(image, distr, transform_from_pix_to_m)
+    bs = 10
+    num_distr = 3
+    images = torch.rand((bs,224, 224, 3), dtype=torch.float)
+    raster_from_agent = torch.eye(3)
+    mean_predictions = ((torch.rand((bs,num_distr,2)))*224)
+    cov_matrix = torch.eye(2).unsqueeze(0).repeat(num_distr,1,1).unsqueeze(0).repeat(bs,1,1,1) * 50
+    mix = torch.distributions.Categorical(torch.rand(bs,num_distr))
+    distr = torch.distributions.multivariate_normal.MultivariateNormal(mean_predictions, cov_matrix)
+    gmm = torch.distributions.MixtureSameFamily(mix, distr)
+
+    img_arr = vis_image_Aleksander(images[0], gmm, raster_from_agent, index =1)
+    plt.imshow(images[0])
+    plt.show()
+    # plt.savefig("orig.png")
     plt.imshow(img_arr)
     plt.show()
+    # plt.savefig("origPlusDistr.png")
+    goal_avail = torch.ones(bs)
+    tgt = torch.rand(bs,12,2)+100
+    raster_from_agent = raster_from_agent.repeat(bs,1,1)
+    imgs = vis_image_batched_Aleksander(images,gmm,raster_from_agent,goal_avail,tgt)
+    plt.imshow(images[0])
+    # plt.savefig("orig.png")
+    plt.show()
+    plt.imshow(imgs[0])
+    plt.show()
+    # plt.savefig("origPlusDistr.png")
+    
+
+
