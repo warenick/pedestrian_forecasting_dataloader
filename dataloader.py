@@ -56,7 +56,11 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         ped_id, ts = self.loader.get_pedId_and_timestamp_by_index(dataset_index, index)
         # print(ped_id)
         indexes = self.loader.get_all_agents_with_timestamp(dataset_index, ts)
-        argsort_inexes = self.loader.argsort_inexes[file]
+
+        try:
+            argsort_inexes = self.loader.argsort_inexes[file]
+        except:
+            argsort_inexes = None
         agents_history = self.loader.get_agent_history(dataset_index, ped_id, ts, indexes, argsort_inexes)
         agents_future = self.loader.get_agent_future(dataset_index, ped_id, ts, indexes, argsort_inexes)
         # agents_history = np.ones((10,8,4), dtype=np.float32)
