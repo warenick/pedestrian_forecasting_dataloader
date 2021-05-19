@@ -56,8 +56,9 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         ped_id, ts = self.loader.get_pedId_and_timestamp_by_index(dataset_index, index)
         # print(ped_id)
         indexes = self.loader.get_all_agents_with_timestamp(dataset_index, ts)
-        agents_history = self.loader.get_agent_history(dataset_index, ped_id, ts, indexes)
-        agents_future = self.loader.get_agent_future(dataset_index, ped_id, ts, indexes)
+        argsort_inexes = self.loader.argsort_inexes[file]
+        agents_history = self.loader.get_agent_history(dataset_index, ped_id, ts, indexes, argsort_inexes)
+        agents_future = self.loader.get_agent_future(dataset_index, ped_id, ts, indexes, argsort_inexes)
         # agents_history = np.ones((10,8,4), dtype=np.float32)
         # agents_future = np.ones((10,12,4), dtype=np.float32)
         agent_history = agents_history[0]
@@ -121,6 +122,15 @@ class DatasetFromTxt(torch.utils.data.Dataset):
                 time_sorted_hist[:, :, self.loader.coors_row] = transform_points(
                     time_sorted_hist[:, :, self.loader.coors_row],
                     np.linalg.inv(pix_to_m["scale"]))
+
+            elif "ros" in file:
+                pix_to_m = self.cfg['ros_h']
+                agent_history[:, 2:] = transform_points(agent_history[:, 2:], np.linalg.inv(pix_to_m["scale"]))
+                agent_future[:, 2:] = transform_points(agent_future[:, 2:], np.linalg.inv(pix_to_m["scale"]))
+                time_sorted_hist[:, :, self.loader.coors_row] = transform_points(
+                    time_sorted_hist[:, :, self.loader.coors_row],
+                    np.linalg.inv(pix_to_m["scale"]))
+
 
 
 

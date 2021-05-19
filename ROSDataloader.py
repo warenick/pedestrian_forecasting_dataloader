@@ -44,7 +44,7 @@ class TrajectoryCollector():
         traj = []
         ts = []
         for b in bb:
-            timestamp = b.header.stamp.to_time()
+            timestamp = b.header.stamp.to_time()*1000 #into ms
             coord = [b.pose.position.x, b.pose.position.y]
             ts.append(timestamp)
             traj.append(coord)
@@ -65,9 +65,9 @@ class TrajectoryCollector():
                     diff = ts - prev_ts
                     if diff>=timediff:
                         prev_ts = ts
-                        out.append([id,val[1][i], val[0][i][0], val[0][i][1]])
+                        out.append([val[1][i], id, val[0][i][0], val[0][i][1]])
                 else:
-                    out.append([val[1][i],id, val[0][i][0], val[0][i][1]]) # id, ts, x, y
+                    out.append([val[1][i], id, val[0][i][0], val[0][i][1]]) # id, ts, x, y
         return out
 
 
@@ -82,8 +82,8 @@ if __name__=="__main__":
     #     rate.sleep()
     #     data = collector.get_monoarray(timediff=None)
     
-    rospy.sleep(40) # collect data over 40s
-    data = collector.get_monoarray(timediff=0.4)
+    rospy.sleep(30) # collect data over 40s
+    data = collector.get_monoarray( timediff=350)
     with open("output.txt", "w") as outfile:
         for line in data:
             string = str(line)[1:-1].replace(", ", '\t')

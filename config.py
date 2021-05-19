@@ -317,6 +317,9 @@ zara_cfg = {"scale": np.array([[-2.595651699999999840e-02, -5.157280400000000145
                                 [1.954012500000000506e-20, 4.217141000000002596e-19, 1.000000000000000444e+00]])
             }  # pix to meters,   x axis inverted? starting from [?, ?]
 
+ros_cfg = {"scale": np.eye(3)
+            }  # pix to meters,   x axis inverted? starting from [?, ?]
+
 student_cfg = {"scale": np.array([[0.02104651,  0.,         7.57676355],
                                   [0.,         0.02386598, 6.87340224],
                                   [0.,         0.,         1.]])
@@ -370,6 +373,7 @@ cfg = {
     },
 
     "SDD_scales": SDD_scales,
+    "ros_h": ros_cfg,
     "zara_h": zara_cfg,
     "student_h": student_cfg,
     "eth_univ_h": eth_univ_cfg,

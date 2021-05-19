@@ -14,13 +14,16 @@ class TrajnetLoader:
 
         self.data_files = data_files
         self.path = path
+        self.dataset_index = []
         self.index_row = 1
+        self.argsort_inexes = {}
         self.delta_t = {"biwi": 1 / 25,
                         "biwi_eth": 1 / 15,
                         "eth_hotel": 1 / 25,
                         "UCY": 1 / 25,
                         "stanford": 1 / 30,
                         "SDD": 1 / 30,
+                        "ros": 1/1000., 
                         # "crowds": 1 / 25,
                         # "students": 1 / 25,
                         }  # 10*msec
@@ -31,6 +34,7 @@ class TrajnetLoader:
                                 "UCY": 10,
                                 "biwi_eth": 6,
                                 "eth_hotel": 10,
+                                "ros":400,
                                 }
         self.ts_row = 0  # timestamp row
         self.coors_row = [2, 3]
@@ -58,7 +62,6 @@ class TrajnetLoader:
                 try:
                     new_name = name[:name.index(".")] + ".npy"
                     self.data[file] = np.load(new_name).astype(np.float32)
-
                 except:
                     self.data[file] = np.loadtxt(path + "/" + file, delimiter=' ', usecols=[0, 1, 2, 3, 4, 5, 6]).astype(np.float32)
                     self.data[file] = self.data[file][self.data[file][:, 6] == 0]
@@ -79,7 +82,12 @@ class TrajnetLoader:
                 self.data[file] = self.data[file][:, :4]
 
             else:
-                self.data[file] = np.genfromtxt(path + "/" + file, delimiter='').astype(np.float32)
+                self.data[file] = np.genfromtxt(path + "/" + file, delimiter='').astype(np.float64)
+                self.argsort_inexes[file] = None
+                if 'ros' in file:
+                    # self.argsort_inexes[file] = np.argsort(self.data[file][:,self.index_row])
+                    self.data[file] = self.data[file][np.argsort(self.data[file][:,self.ts_row])]
+                    self.data[file] = self.data[file][np.argsort(self.data[file][:,self.index_row],kind='mergesort')]
             if cfg["raster_params"]["use_map"]:
                 img_format = ".png"
                 if dataset == "SDD":
@@ -132,12 +140,14 @@ class TrajnetLoader:
         data = self.data[file]
         return data[data[:, self.ts_row] == timestamp][:, self.index_row]
 
-    def get_agent_history(self, dataset_ind: int, ped_id: int, timestamp: float, neighb_indexes) -> np.array:
+    def get_agent_history(self, dataset_ind: int, ped_id: int, timestamp: float, neighb_indexes, argsort_inexes = None) -> np.array:
 
         """
          :param dataset_ind: index of file
          :param ped_id: ID of agent
          :param timestamp:  timestamp from txt file. Observed history is [timespemp - history_len, timespemp]
+         :param neighb_indexes: IDs of neghbors
+         :param argsort_inexes: Optional array of integer indices that sort array a into ascending order. They are typically the result of argsort.
          :return: observed trajectory of specified agent np.array shape(self.history_len+1,4).
         """
         neighb_indexes = neighb_indexes[neighb_indexes != ped_id]
@@ -154,13 +164,19 @@ class TrajnetLoader:
         # st = time.time()
         timecoef = self.delta_timestamp[file[0:file.index("/")]] * self.delta_t[file[0:file.index("/")]]
         full_hist_scene = (np.zeros((int(self.history_len / timecoef), 4)) - 1)[np.newaxis]
+        # TODO:
+        
         start_stop_ped_ind = [ped_id, ped_id+1]
         for ind in neighb_indexes:
             start_stop_ped_ind.append(ind)
             start_stop_ped_ind.append(ind+1)
+        ind = np.searchsorted(data[:, self.index_row], start_stop_ped_ind, sorter=argsort_inexes)
+            
+        # TODO:
 
-        ind = np.searchsorted(data[:, self.index_row], start_stop_ped_ind)
-        # ind_start = np.searchsorted(data[:, self.index_row], start_stop_ped_ind)
+        # if len(neighb_indexes)<1:
+        #     # indexes_start = 
+        # else:
         indexes_start = ind[::2]
         # ind_stop = np.searchsorted(data[:, self.index_row], ped_id + 1)
         indexes_stop = ind[1::2]
@@ -188,16 +204,18 @@ class TrajnetLoader:
             #     data = data[:, (0, 1, 2, 4)]
             timecoef = self.delta_timestamp[file[0:file.index("/")]] * self.delta_t[file[0:file.index("/")]]
             out = np.zeros((int(self.history_len / timecoef), 4)) - 1
-            out[0:len(data_), :] = np.flip(data_, axis=0)
+            out[0:len(data_), :] = np.flip(data_[-out.shape[0]:], axis=0)
             full_hist_scene = np.concatenate((full_hist_scene, out[np.newaxis]), axis=0)
 
         return full_hist_scene[1:]
 
-    def get_agent_future(self, dataset_ind: int, ped_id: int, timestamp: float, neighb_indexes) -> np.array:
+    def get_agent_future(self, dataset_ind: int, ped_id: int, timestamp: float, neighb_indexes, argsort_inexes = None) -> np.array:
         """
          :param dataset_ind: index of file
          :param ped_id: ID of agent
          :param timestamp:  timestamp from txt file. Target future is [timespemp, timespemp + pred_len]
+         :param neighb_indexes: IDs of neghbors
+         :param argsort_inexes: Optional array of integer indices that sort array a into ascending order. They are typically the result of argsort.
          :return: future(target) trajectory of specified agent np.array shape(self.history_len+1,4).
         """
 
@@ -211,7 +229,7 @@ class TrajnetLoader:
         for ind in neighb_indexes:
             start_stop_ped_ind.append(ind)
             start_stop_ped_ind.append(ind + 1)
-        ind = np.searchsorted(data[:, self.index_row], start_stop_ped_ind)
+        ind = np.searchsorted(data[:, self.index_row], start_stop_ped_ind, sorter=argsort_inexes)
         indexes_start = ind[::2]
         indexes_stop = ind[1::2]
 
