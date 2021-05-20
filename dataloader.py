@@ -27,12 +27,50 @@ import math
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import os
-idk = 0
-max_size_x = 0
-max_size_y = 0
-torch.multiprocessing.set_sharing_strategy('file_system')
 
 
+# idk = 0
+# max_size_x = 0
+# max_size_y = 0
+# torch.multiprocessing.set_sharing_strategy('file_system')
+
+class DataStructure:
+    def __init__(self):
+        self.agent_pose = None
+        self.agent_pose_av = None
+
+        self.neighb_poses = None
+        self.neighb_poses_av = None
+
+        self.img = None
+        self.mask = None
+        self.target = None
+        self.target_av = None
+        self.map_affine = None
+        self.cropping_points = None
+        self.raster_from_agent = None
+        self.raster_from_world = None
+        self.agent_from_world = None
+        self.world_from_agent = None
+        self.loc_im_to_glob = None
+        self.world_to_image = None
+        self.centroid = None
+        self.extent = None
+        self.yaw = None
+        self.speed = None
+        self.forces = None
+        self.rot_mat = None
+        self.pix_to_m = None
+        self.loc_im_to_glob = None
+        self.orig_pixels_hist = None
+        self.orig_pixels_future = None
+
+    def __getitem__(self, i):
+        res = [self.img, self.mask, self.agent_pose, self.agent_pose_av, self.target, self.target_av,
+               self.neighb_poses, self.agent_pose_av, self.raster_from_agent, self.raster_from_world, self.world_from_agent, self.agent_from_world,
+               self.loc_im_to_glob, self.forces, self.rot_mat,
+               self.cropping_points, self.orig_pixels_hist, self.orig_pixels_future, self.pix_to_m]
+        return res[i]
 
 class DatasetFromTxt(torch.utils.data.Dataset):
 
@@ -50,11 +88,11 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         return self.loader.data_len
 
     def __getitem__(self, index: int):
-        # print(os.getpid(), 1, time.time())
+
         dataset_index = self.loader.get_subdataset_ts_separator(index)
         file = self.files[dataset_index]
         ped_id, ts = self.loader.get_pedId_and_timestamp_by_index(dataset_index, index)
-        # print(ped_id)
+
         indexes = self.loader.get_all_agents_with_timestamp(dataset_index, ts)
 
         try:
@@ -69,33 +107,20 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         agent_future = agents_future[0]
         time_sorted_hist = np.array(agents_history[1:])  # sort_neigh_history(others_history)
         time_sorted_future = np.array(agents_future[1:])  # sort_neigh_future(others_future)
-        # indexes = indexes[indexes != ped_id]
-        # others_history = []
-        # others_future = []
+
         forces = np.zeros(6)
         if self.use_forces:
             forces = self.force_from_txt.get(index)
 
-        # for index in indexes:
-        #     history = self.loader.get_agent_history(dataset_index, index, ts)
-        #     others_history.append(history)
-        #     future = self.loader.get_agent_future(dataset_index, index, ts)
-        #     others_future.append(future)
-
-        if len(time_sorted_future) == 0:
-            time_sorted_future = np.zeros((0, 9, 4))
-        if len(time_sorted_hist) == 0:
-            time_sorted_hist = np.zeros((0, 9, 4))
-        #     others_future = np.zeros((0, 12, 4))
-
+        assert len(time_sorted_future) != 0
+        assert len(time_sorted_hist) != 0
 
         agent_hist_avail = (agent_history[:, 0] != -1).astype(int)
         target_avil = (agent_future[:, 0] != -1).astype(int)
         hist_avail = (time_sorted_hist[:, :, 0] != -1).astype(int)
         neighb_future_avail = (time_sorted_future[:, :, 0] != -1).astype(int)
         img, mask, transform = self.loader.get_map(dataset_index, ped_id, ts)
-        # img = np.ones((600,600,3), dtype=np.float32)
-        # mask = np.ones((600,600) , dtype=np.float32)
+
         if not self.cfg["raster_params"]["use_map"]:
             if "zara" in file:
                 pix_to_m = self.cfg["zara_h"]
