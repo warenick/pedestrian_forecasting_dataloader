@@ -364,11 +364,15 @@ def vis_pdf2(image, distrib, transform_from_pix_to_m, index):
     tgrid = torch.tensor(grid, dtype=torch.float)
     mix = torch.distributions.Categorical(distrib.mixture_distribution.logits[index, :])
     mean = distrib.component_distribution.mean[index, :]
-    cov_mat = distrib.component_distribution.covariance_matrix[index, :]
-    distr = torch.distributions.multivariate_normal.MultivariateNormal(mean, cov_mat)
+    scale_tril = distrib.component_distribution.scale_tril[index, :]
+    distr = torch.distributions.multivariate_normal.MultivariateNormal(mean, scale_tril=scale_tril)
     gmm = torch.distributions.MixtureSameFamily(mix, distr)
     tgrid = tgrid.to(mean.device)
-    distr_image = torch.exp(gmm.log_prob(tgrid)).reshape(image.shape[:2])
+    if gmm.mean.shape[0] == 12:
+        tgrid = tgrid.reshape(-1,1,2).repeat(1,12,1)
+        distr_image = torch.sum(torch.exp(gmm.log_prob(tgrid)), axis=1).reshape(image.shape[:2])
+    else:
+        distr_image = torch.exp(gmm.log_prob(tgrid)).reshape(image.shape[:2])
     return distr_image
 
 
@@ -483,20 +487,31 @@ def vis_image_Aleksander(image, distr, raster_from_agent, tgt = None,  index = 0
     '''
     try:
         means_meters = distr.component_distribution.mean.detach().cpu().numpy()[index]
-        cov_meters = distr.component_distribution.covariance_matrix.detach().cpu().numpy()[index]
+        # cov_meters = distr.component_distribution.covariance_matrix.detach().cpu().numpy()[index]
     except:
         means_meters = distr.mean.unsqueeze(1).detach().cpu().numpy()[index]
-        cov_meters = distr.covariance_matrix.unsqueeze(1).detach().cpu().numpy()[index]
-    pose_rasters = transform_points(means_meters, raster_from_agent)
+        # cov_meters = distr.covariance_matrix.unsqueeze(1).detach().cpu().numpy()[index]
+    # pose_rasters = transform_points(means_meters, raster_from_agent)
     scale_raster_from_agent = raster_from_agent.clone()
     scale_raster_from_agent[:2, 2] = 0
     # covs = transform_points(transform_points(cov_meters, raster_from_agent))
 
     if distr.mean.shape[0] == 1:
         # mean_pix = torch.cat((distr.mean.detach(), torch.tensor([[0]])), dim=1)
-        mean_pix = transform_points(distr.mean.detach(), raster_from_agent)
-        image = cv2.ellipse(image.numpy(), ((int(mean_pix[0, 0]), int(mean_pix[0, 1])), (10, 10), 0),
-                    (220, 0, 150), thickness=-1)
+        if distr.mean.ndim == 3:
+            vis_mean_gmm = 0
+            if vis_mean_gmm:
+                image = image.numpy()
+                for tstep in range(distr.mean.shape[1]):
+                    mean_pix = transform_points(distr.mean[:, tstep].detach(), raster_from_agent)
+                    image = cv2.ellipse(image, ((int(mean_pix[0, 0]), int(mean_pix[0, 1])), (10, 10), 0),
+                                        (220, 0, 150), thickness=-1)
+
+        else:
+            mean_pix = transform_points(distr.mean.detach(), raster_from_agent)
+
+            image = cv2.ellipse(image.numpy(), ((int(mean_pix[0, 0]), int(mean_pix[0, 1])), (10, 10), 0),
+                        (220, 0, 150), thickness=-1)
         image = torch.tensor(image)
 
         # draw.ellipse()
@@ -506,8 +521,8 @@ def vis_image_Aleksander(image, distr, raster_from_agent, tgt = None,  index = 0
 
     dist_image = vis_pdf2(image, distr, raster_from_agent, index=index)
     cmap = plt.get_cmap('jet')
-    dist_image = cmap(2.5*dist_image.detach().numpy())
-    img_arr = torch.clamp(0.7*image/255 + 0.5 * dist_image[:, :, :3], max=1)
+    dist_image = cmap(0.8*dist_image.detach().numpy())
+    img_arr = torch.clamp(0.7*image/255 + 0.3 * dist_image[:, :, :3], max=1)
     # img_arr = heatmap2d_withiImg(dist_image, image)
     return img_arr[:, :, :3]
 
