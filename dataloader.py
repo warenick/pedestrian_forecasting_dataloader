@@ -7,7 +7,7 @@ try:
     from force_from_txt import Force_from_txt
     from trajenetloader import TrajnetLoader
     from utils import crop_image_crowds
-    from utils import trajectory_orientation, rotate_image
+    from utils import trajectory_orientation, rotate_image, DataStructure
     from utils import sdd_crop_and_rotate, transform_points
     from config import cfg
     from transformations import ChangeOrigin
@@ -17,7 +17,7 @@ except ImportError:
     from .trajenetloader import TrajnetLoader
     from .utils import crop_image_crowds
     from .utils import trajectory_orientation, rotate_image
-    from .utils import sdd_crop_and_rotate, transform_points
+    from .utils import sdd_crop_and_rotate, transform_points, DataStructure
     from .config import cfg
     from .transformations import ChangeOrigin
 
@@ -25,46 +25,6 @@ import math
 from tqdm import tqdm
 # import matplotlib.pyplot as plt
 # import os
-
-
-class DataStructure:
-    def __init__(self):
-        self.agent_pose = None
-        self.agent_pose_av = None
-
-        self.neighb_poses = None
-        self.neighb_poses_av = None
-
-        self.img = None
-        self.mask = None
-        self.target = None
-        self.target_av = None
-        self.map_affine = None
-        self.cropping_points = None
-        self.raster_from_agent = None
-        self.raster_from_world = None
-        self.agent_from_world = None
-        self.world_from_agent = None
-        self.loc_im_to_glob = None
-        self.world_to_image = None
-        self.centroid = None
-        self.extent = None
-        self.yaw = None
-        self.speed = None
-        self.forces = None
-        self.rot_mat = None
-        self.pix_to_m = None
-        self.loc_im_to_glob = None
-        self.orig_pixels_hist = None
-        self.orig_pixels_future = None
-
-    def __getitem__(self, ind):
-        res = [self.img, self.mask, self.agent_pose, self.agent_pose_av, self.target, self.target_av,
-               self.neighb_poses, self.agent_pose_av, self.raster_from_agent, self.raster_from_world,
-               self.world_from_agent, self.agent_from_world,
-               self.loc_im_to_glob, self.forces, self.rot_mat,
-               self.cropping_points, self.orig_pixels_hist, self.orig_pixels_future, self.pix_to_m]
-        return res[ind]
 
 
 class DatasetFromTxt(torch.utils.data.Dataset):
@@ -151,7 +111,7 @@ class DatasetFromTxt(torch.utils.data.Dataset):
                                                   hist_avail, img, mask, neighb_time_sorted_future,
                                                   neighb_time_sorted_hist, target_avil, transform)
 
-            res.append(file)
+            # res.append(file)
             return res
 
     def ssd_unnorm_image(self, agent_future, agent_hist_avail, agent_history, file, forces, hist_avail, img, mask,
@@ -493,7 +453,7 @@ class DatasetFromTxt(torch.utils.data.Dataset):
 
     def crop_and_normilize(self, agent_future, agent_hist_avail, agent_history, file, hist_avail, img, target_avil,
                            time_sorted_hist, forces, mask, border_width, transform):
-
+        output = DataStructure()
         # rotate in a such way that last hisory points are horizontal (elft to right),
         # crop to spec in cfg area and resize
         #  calcultate transformation matrixes for pix to meters
@@ -501,17 +461,23 @@ class DatasetFromTxt(torch.utils.data.Dataset):
 
         file = file[file.index("/") + 1:file.index(".")]
 
-        globPix_to_locraster = np.eye(3)
-        tl_y, tl_x, br_y, br_x = (0, 0, 0, 0)
-        map_to_local = None
-        if img is None:
+        #save file, and initial (from dataset) positions and availabilities
+        output.file = file
+        output.orig_pixels_hist = np.copy(agent_history[:, self.loader.coors_row])
+        output.orig_pixels_future = np.copy(agent_future[:, self.loader.coors_row])
+        output.agent_pose_av = agent_hist_avail
+        output.target_av = target_avil
+        output.neighb_poses_av = hist_avail
 
+
+        tl_y, tl_x, br_y, br_x = (0, 0, 0, 0)
+
+        if img is None:
             scale = np.eye(3)
         else:
-            img, globPix_to_locraster, scale, \
-            mask, map_to_local, \
+            img, _, scale, \
+            mask, _, \
             (tl_y, tl_x, br_y, br_x), rotation_matrix = sdd_crop_and_rotate(img, agent_history[:, 2:],
-                                                                            border_width=border_width,
                                                                             draw_traj=1,
                                                                             pix_to_m_cfg=self.cfg['SDD_scales'],
                                                                             cropping_cfg=self.cfg['cropping_cfg'],
@@ -522,6 +488,7 @@ class DatasetFromTxt(torch.utils.data.Dataset):
                                                                             transform=transform,
                                                                             neighb_hist=time_sorted_hist,
                                                                             neighb_hist_avail=hist_avail)
+
 
         import cv2
 
@@ -543,34 +510,47 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         br_y_intermidiate = br_y - (agent_center_intermidiate[1] - radius)
         br_x_intermidiate = br_x - (agent_center_intermidiate[0] - radius)
 
+        output.cropping_points = np.array([tl_x_intermidiate, tl_y_intermidiate, br_x_intermidiate, br_y_intermidiate])
+
         # TODO: depend at pic size in meters!
         size_constant = self.cfg["cropping_cfg"]["image_area_meters"][0] * 0.08
         img_size = (
             int(size_constant * self.loader.img_size["SDD"][0]), int(size_constant * self.loader.img_size["SDD"][1]))
         new_im = np.zeros((img_size[0], img_size[1], 3), dtype=np.uint8)
         new_im[:img_.shape[0], :img_.shape[1]] = np.copy(img_)
-        img = new_im
         del img_
+        img = new_im
+
+        output.img = img
+
         co_operator = ChangeOrigin(
             new_origin=((agent_center_intermidiate[0] - radius, agent_center_intermidiate[1] - radius)),
             rotation=np.eye(2))
+
         rotation_matrix_cropped = co_operator.transformation_matrix @ rotation_matrix @ np.linalg.inv(
             co_operator.transformation_matrix)
+
+        output.rot_mat = rotation_matrix_cropped
+        output.forces = transform_points(forces, rotation_matrix_cropped)
 
         tl_co_operator = ChangeOrigin(
             new_origin=((tl_x, tl_y)),
             rotation=np.eye(2))
 
         intermidiate_to_locraster = scale @ tl_co_operator.transformation_matrix @ rotation_matrix
-        # cv2.warpAffine(img, intermidiate_to_locraster[:2, :], (img.shape[1], img.shape[0]))
 
         if mask is not None:
             new_mask = np.zeros((img_size[0], img_size[1], 1), dtype=np.uint8)
             new_mask[:mask.shape[0], :mask.shape[1]] = np.copy(mask)
             mask = new_mask.astype(np.uint8)
 
+        output.mask = mask
+
         pix_to_m = np.eye(3) * self.cfg['SDD_scales'][file]["scale"]
         pix_to_m[2, 2] = 1
+
+        output.pix_to_m = pix_to_m
+
         initial_resize = transform.copy()
         initial_resize[:2, 2:] *= 0
         new_origin_operator = ChangeOrigin(new_origin=(intermidiate_to_locraster @ agent_center_intermidiate)[:2],
@@ -588,9 +568,16 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         # global_pix_from_raster = np.linalg.inv(transform) @ np.linalg.inv(globPix_to_locraster)
         world_from_raster = pix_to_m @ np.linalg.inv(intermidiate_to_locraster @ transform)
 
+        output.loc_im_to_glob = np.linalg.inv(pix_to_m) @ world_from_raster
+
         raster_from_world = np.linalg.inv(world_from_raster)
         world_from_agent = world_from_raster @ np.linalg.inv(agent_from_raster)
         agent_from_world = np.linalg.inv(world_from_agent)
+
+        output.agent_from_world = agent_from_world
+        output.world_from_agent = world_from_agent
+        output.raster_from_world = raster_from_world
+        output.raster_from_agent = np.linalg.inv(agent_from_raster)
 
         agent_hist_localM = transform_points(agent_history[:, self.loader.coors_row],
                                              # pix_to_m @ intermidiate_to_locraster @ transform)
@@ -610,14 +597,18 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         agent_hist_localM, neigh_localM = self.calc_speed_accel(agent_hist_localM, neigh_localM, agent_hist_avail,
                                                                 hist_avail)
 
-        res = [img.astype(np.uint8), mask, agent_hist_localM, agent_hist_avail, target_localM, target_avil,
-               neigh_localM,
-               hist_avail, np.linalg.inv(agent_from_raster), raster_from_world, world_from_agent, agent_from_world,
-               np.linalg.inv(pix_to_m) @ world_from_raster, transform_points(forces, rotation_matrix_cropped),
-               rotation_matrix_cropped,
-               np.array([tl_x_intermidiate, tl_y_intermidiate, br_x_intermidiate, br_y_intermidiate]),
-               agent_history[:, self.loader.coors_row], agent_future[:, self.loader.coors_row], pix_to_m]
-        return res
+        output.target = target_localM
+        output.neighb_poses = neigh_localM
+        output.agent_pose = agent_hist_localM
+
+        # res = [img.astype(np.uint8), mask, agent_hist_localM, agent_hist_avail, target_localM, target_avil,
+        #        neigh_localM,
+        #        hist_avail, np.linalg.inv(agent_from_raster), raster_from_world, world_from_agent, agent_from_world,
+        #        np.linalg.inv(pix_to_m) @ world_from_raster, transform_points(forces, rotation_matrix_cropped),
+        #        rotation_matrix_cropped,
+        #        np.array([tl_x_intermidiate, tl_y_intermidiate, br_x_intermidiate, br_y_intermidiate]),
+        #        agent_history[:, self.loader.coors_row], agent_future[:, self.loader.coors_row], pix_to_m]
+        return output
 
 
 class NeighboursHistory:
@@ -721,7 +712,6 @@ class UnifiedInterface:
         self.yaw = None
         self.speed = None
         # print(time.time() - st)
-
 
 def collate_wrapper(batch):
     return UnifiedInterface(batch)

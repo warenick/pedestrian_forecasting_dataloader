@@ -19,6 +19,49 @@ try:
 except:
     from .transformations import Resize, AddBorder, Rotate, Crop
 
+
+
+class DataStructure:
+    def __init__(self):
+        self.agent_pose = None
+        self.agent_pose_av = None
+
+        self.neighb_poses = None
+        self.neighb_poses_av = None
+
+        self.img = None
+        self.mask = None
+        self.target = None
+        self.target_av = None
+        self.map_affine = None
+        self.cropping_points = None
+        self.raster_from_agent = None
+        self.raster_from_world = None
+        self.agent_from_world = None
+        self.world_from_agent = None
+        self.loc_im_to_glob = None
+        self.world_to_image = None
+        self.centroid = None
+        self.extent = None
+        self.yaw = None
+        self.speed = None
+        self.forces = None
+        self.rot_mat = None
+        self.pix_to_m = None
+        self.loc_im_to_glob = None
+        self.orig_pixels_hist = None
+        self.orig_pixels_future = None
+        self.file = None
+
+    def __getitem__(self, ind):
+        res = [self.img, self.mask, self.agent_pose, self.agent_pose_av, self.target, self.target_av,
+               self.neighb_poses, self.neighb_poses_av, self.raster_from_agent, self.raster_from_world,
+               self.world_from_agent, self.agent_from_world,
+               self.loc_im_to_glob, self.forces, self.rot_mat,
+               self.cropping_points, self.orig_pixels_hist, self.orig_pixels_future, self.pix_to_m, self.file]
+        return res[ind]
+
+
 def preprocess_data(data, cfg, device="cpu") -> torch.tensor:
     imgs_tensor = (torch.tensor(data.image, device=device, dtype=torch.float32).permute(0, 3, 1, 2))/255
 
@@ -248,15 +291,32 @@ def calc_transform_matrix(init_coord, angle, scale, output_shape: List):
     return transf
 
 
-def sdd_crop_and_rotate(img: np.array, path, border_width=400, draw_traj=1, pix_to_m_cfg=SDD_scales,
+def sdd_crop_and_rotate(img: np.array, path, draw_traj=1, pix_to_m_cfg=SDD_scales,
                         cropping_cfg=cropping_cfg, file=None, mask=None, scale_factor=1, transform=None, neighb_hist=None,
                         neighb_hist_avail=None):
+    """
+
+    :param img: image of scene, np.array, ndim == 3
+    :param path: np array of observed agent history, ndim==2, [time,poses], typically [8,2]
+
+    :param draw_traj:
+    :param pix_to_m_cfg:
+    :param cropping_cfg:
+    :param file:
+    :param mask:
+    :param scale_factor:
+    :param transform:
+    :param neighb_hist:
+    :param neighb_hist_avail:
+    :return:
+    """
+
     # print(img.dtype)
     # img_pil = Image.fromarray(np.asarray(img, dtype="uint8"))
     # mask_pil = Image.fromarray(np.asarray(mask, dtype="uint8"))
     # draw = ImageDraw.Draw(img_pil)
     # scale_factor = 2
-    scaled_border = border_width // scale_factor
+
 
 
     draw_h(draw_traj, img, path, transform, neighb_hist[:,:,2:], neighb_hist_avail)
