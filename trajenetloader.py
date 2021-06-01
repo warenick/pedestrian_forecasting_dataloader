@@ -51,12 +51,17 @@ class TrajnetLoader:
                          "ETH/UCY": (int(2100 / self.resize_datastes["ETH/UCY"]), int(2000 / self.resize_datastes["ETH/UCY"]))}
         self.loaded_imgs = {}
         self.img_transf = {}
+        self.unique_ped_ids = {}
+        self.unique_ped_ids_len = 0
+        self.sub_data_len_by_ped_ids = [0]
 
         for file in (data_files):
             dataset = "ETH/UCY"
             if path[-1] != "/":
                 path += "/"
             name = path + file
+
+            ## IF SDD: load from npy (faster), skip types (load only ped id , ts, bboxes, flag of being visible)
             if "SDD" in file:
                 dataset = "SDD"
                 try:
@@ -65,35 +70,45 @@ class TrajnetLoader:
                 except:
                     self.data[file] = np.loadtxt(path + "/" + file, delimiter=' ', usecols=[0, 1, 2, 3, 4, 5, 6]).astype(np.float32)
                     self.data[file] = self.data[file][self.data[file][:, 6] == 0]
-                    # new_name = name[:name.index(".")] + ".npy"
-                    # np.save(new_name, self.data[file])
-                    # print("saving to ", new_name)
 
                 # filter each 12th data point (to be 0.4 fps)
                 self.data[file] = self.data[file][
                     (self.data[file][:, 5] + (self.data[file][:, 5].min() % 12)) % 12 == 0]
-                # ts, ped_id, bboxes
+
+                #rearrange: ts, ped_id, bboxes
                 self.data[file] = self.data[file][:, (5, 0, 1, 2, 3, 4)]
-                # ts, ped_id, pose
+
+                # from bboxes to center points
                 self.data[file][:, 2] = (self.data[file][:, 2] + self.data[file][:, 4]) / 2
                 self.data[file][:, 3] = (self.data[file][:, 3] + self.data[file][:, 5]) / 2
-
-
                 self.data[file] = self.data[file][:, :4]
 
-            else:
+            ## IF NOT SDD
+            if "SDD" not in file:
                 self.data[file] = np.genfromtxt(path + "/" + file, delimiter='').astype(np.float64)
                 self.argsort_inexes[file] = None
+
                 if 'ros' in file:
                     # self.argsort_inexes[file] = np.argsort(self.data[file][:,self.index_row])
                     self.data[file] = self.data[file][np.argsort(self.data[file][:,self.ts_row])]
-                    self.data[file] = self.data[file][np.argsort(self.data[file][:,self.index_row],kind='mergesort')]
+                    self.data[file] = self.data[file][np.argsort(self.data[file][:,self.index_row], kind='mergesort')]
+
+
+            ### save ped ids
+            if cfg["one_ped_one_traj"]:
+                self.unique_ped_ids[file] = np.unique(self.data[file][:,1])
+                self.unique_ped_ids_len += len(self.unique_ped_ids[file])
+                self.sub_data_len_by_ped_ids.append(self.sub_data_len_by_ped_ids[-1]+len(self.unique_ped_ids[file]))
+
+            ## load images
             if cfg["raster_params"]["use_map"]:
                 img_format = ".png"
                 if dataset == "SDD":
                     img_format = ".jpg"
                 img = cv2.imread(name[:name.index(".")] + img_format).astype(np.uint8)
                 mask = np.ones_like(img)[:, :, 0]
+
+                ## load segmentations
                 if cfg["raster_params"]["use_segm"]:
                     mask = np.load(name[:name.index(".")] + "_s.npy").astype(np.uint8)
 
@@ -112,20 +127,22 @@ class TrajnetLoader:
                 img = unified_img
                 mask = unified_mask
 
-                #
+                # apply border  transformations
                 border = self.border_datastes[dataset] // self.resize_datastes[dataset]
                 transf_border = AddBorder(border)
                 img = transf_border.apply(img)
                 mask = transf_border.apply(mask)
                 transf = transf_border.transformation_matrix @ transf
 
-
+                ## save to buffer
                 self.loaded_imgs[name[:name.index(".")] + img_format] = img
                 self.img_transf[name[:name.index(".")] + img_format] = transf
                 self.loaded_imgs[name[:name.index(".")] + "_s.npy"] = mask
 
             self.data_len += len(self.data[file])
             self.sub_data_len.append(self.data_len)
+
+
 
 
     def get_all_agents_with_timestamp(self, dataset_ind: int, timestamp: float) -> np.array:
@@ -259,8 +276,11 @@ class TrajnetLoader:
             :param index: index of data (row) in whole(combined) dataset
             :return: index of dataset file
         """
+        if self.cfg["one_ped_one_traj"]:
+            dataset_ind, = np.where(np.array(self.sub_data_len_by_ped_ids) <= index)
+            return dataset_ind[-1]
+
         dataset_ind, = np.where(np.array(self.sub_data_len) <= index)
-        #         print(dataset_ind)
         return dataset_ind[-1]
 
     def get_pedId_and_timestamp_by_index(self, dataset_ind: int, index: int) -> (int, int):
@@ -274,6 +294,20 @@ class TrajnetLoader:
         """
         file = self.data_files[dataset_ind]
         data = self.data[file]
+        # when shorter dataset with one trajectory for each ped use self.sub_data_len_by_ped_ids as separator
+        if self.cfg["one_ped_one_traj"]:
+            index = index - self.sub_data_len_by_ped_ids[dataset_ind]
+            ped_id = self.unique_ped_ids[file][index]
+            num_of_observations = self.data[file][self.data[file][:, 1] == ped_id].shape[0]
+
+            # start_from_index = num_of_observations // 20 * 8 #min(num_of_observations, 8)
+            if num_of_observations > 2:
+                start_from_index = np.random.randint(1, num_of_observations-1)
+            else:
+                start_from_index=0
+            ts = self.data[file][self.data[file][:, 1] == ped_id][start_from_index, 0]
+            return ped_id, ts
+
         index = index - self.sub_data_len[dataset_ind]
         ts = data[index, self.ts_row]
         ped_id = data[index, self.index_row]
