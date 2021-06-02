@@ -713,6 +713,51 @@ class UnifiedInterface:
         self.speed = None
         # print(time.time() - st)
 
+    def __str__(self) -> str:
+        sp = "\t"
+        sn = "\t\n"
+        ff = "{:10.3f}"
+        output = "UnifiedInterface batch state"+sn
+        for batch in range(len(self.history_agents)):
+            output +=sn+sp+"batch: "+str(batch)+sn
+            output +=sp+"agent"+sn
+            output +=sp+"history_positions"+sp+"history_av"+sn
+                    # "image"+sp+\
+                    # "segm"+sp+\
+                    # "forces"+sp+\
+                    # "map_affine"+sp+\
+                    # "cropping_points"+sp+\
+                    # "tgt"+sp+\
+                    # "tgt_avail"+sp+\
+                    # "raster_from_agent"+sp+\
+                    # "raster_from_world"+sp+\
+                    # "agent_from_world"+sp+\
+                    # "world_from_agent"+sp+\
+                    # "loc_im_to_glob"+sp+\
+                    # "world_to_image"+sp+\
+                    # "centroid"+sp+\
+                    # "extent"+sp+\
+                    # "yaw"+sp+\
+                    # "speed"+sp+\
+                    # sn
+            # output += table_legend
+            for step in range(len(self.history_positions[batch])):
+                output += sp+ff.format(self.history_positions[batch][step][0])+sp+\
+                    ff.format(self.history_positions[batch][step][1])+sp+\
+                    str(self.history_av[batch][step])+sn
+            for neigh in range(len(self.history_agents[batch])):
+                output += sp+"neigh:"+str(neigh)+sn
+                output += sp+"history_positions"+sp+"history_av"+sn
+                for step in range(len(self.history_agents[batch][neigh])):
+                    output += sp+ff.format(self.history_agents[batch][neigh][step][0])+sp+\
+                        ff.format(self.history_agents[batch][neigh][step][1])+sp+\
+                        str(self.history_agents_avail[batch][neigh][step])+sn
+        return output
+                
+
+
+
+
 def collate_wrapper(batch):
     return UnifiedInterface(batch)
 
