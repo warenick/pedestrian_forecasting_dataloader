@@ -40,6 +40,10 @@ class DatasetFromTxt(torch.utils.data.Dataset):
             self.force_from_txt = Force_from_txt(forces_file)
 
     def __len__(self):
+
+        if self.cfg["one_ped_one_traj"]:
+            return self.loader.unique_ped_ids_len
+
         return self.loader.data_len
 
     def __getitem__(self, index: int):
