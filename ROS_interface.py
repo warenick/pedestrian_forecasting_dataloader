@@ -8,7 +8,7 @@ from dataloader import UnifiedInterface
 
 class TrajectoryCollector():
     # TODO: optimize this
-    # TODO: not so fast
+    # TODO: just do it later
     def __init__(self, collect=False, timedif = None) -> None:
         '''
         :params collect: keep all recieved uniq data if True
@@ -226,6 +226,12 @@ class TrajectoryCollector():
         if len(list_of_chunks)<1: return None # no one in agents have data
         return UnifiedInterface(list_of_chunks)
 
+
+class Visualiser():
+    def __init__(self) -> None:
+        pass
+    def 
+        
 
 if __name__ == "__main__":
     # Convertor checking
