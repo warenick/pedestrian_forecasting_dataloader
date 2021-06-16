@@ -1,3 +1,5 @@
+import torch
+
 try:
     from dataloader import DatasetFromTxt, collate_wrapper
     from config import cfg
@@ -7,10 +9,12 @@ except:
     from .config import cfg
     from .utils import transform_points, preprocess_data
 
-import torch
+
 import numpy as np
 from tqdm import tqdm
 from torch.utils.data import DataLoader
+
+
 
 torch.manual_seed(46)
 np.random.seed(46)
@@ -43,7 +47,7 @@ def test_speed_img_segm_area_local_meters():
     cfg["cropping_cfg"]["image_area_meters"] = [20, 20]
     dataset = DatasetFromTxt(path_, files_all, cfg)
     dataloader = DataLoader(dataset, batch_size=128 + 64,
-                            shuffle=True, num_workers=8, collate_fn=collate_wrapper)  # , prefetch_factor=3)
+                            shuffle=True, num_workers=0, collate_fn=collate_wrapper)  # , prefetch_factor=3)
 
     pbar = tqdm(dataloader)
 
