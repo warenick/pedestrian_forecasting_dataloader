@@ -51,16 +51,16 @@ def get_train_val_dataloaders(path_, cfg, validate_with, *args):
 
     elif validate_with == "SDD":
         files_train = ["SDD/bookstore_0.txt", "SDD/bookstore_1.txt", "SDD/bookstore_2.txt", "SDD/bookstore_3.txt",
-                 "SDD/bookstore_4.txt", "SDD/bookstore_5.txt", "SDD/bookstore_6.txt",
+                 "SDD/bookstore_4.txt", "SDD/bookstore_5.txt",
                  "SDD/coupa_0.txt", "SDD/coupa_2.txt", "SDD/coupa_3.txt",
                  "SDD/deathCircle_0.txt", "SDD/deathCircle_1.txt", "SDD/deathCircle_2.txt", "SDD/deathCircle_3.txt",
-                 "SDD/deathCircle_4.txt",
+
                  "SDD/gates_0.txt", "SDD/gates_1.txt", "SDD/gates_2.txt", "SDD/gates_3.txt", "SDD/gates_4.txt",
                  "SDD/gates_5.txt",  "SDD/gates_7.txt", "SDD/gates_8.txt",
                  "SDD/hyang_0.txt", "SDD/hyang_1.txt", "SDD/hyang_2.txt", "SDD/hyang_3.txt", "SDD/hyang_4.txt",
                  "SDD/hyang_5.txt", "SDD/hyang_6.txt", "SDD/hyang_7.txt", "SDD/hyang_8.txt", "SDD/hyang_9.txt",
                  "SDD/hyang_10.txt", "SDD/hyang_11.txt",
-                 "SDD/hyang_12.txt", "SDD/hyang_13.txt", "SDD/hyang_14.txt",
+                 "SDD/hyang_12.txt", "SDD/hyang_13.txt",
                  "SDD/little_0.txt", "SDD/little_2.txt", "SDD/little_3.txt",
                  "SDD/nexus_0.txt", "SDD/nexus_2.txt", "SDD/nexus_3.txt", "SDD/nexus_4.txt",
                  "SDD/nexus_5.txt", "SDD/nexus_6.txt", "SDD/nexus_7.txt", "SDD/nexus_8.txt", "SDD/nexus_9.txt",
@@ -69,7 +69,8 @@ def get_train_val_dataloaders(path_, cfg, validate_with, *args):
                  # "SDD/quad_0.txt", "SDD/quad_1.txt", "SDD/quad_2.txt", "SDD/quad_3.txt",
                  ]
 
-        files_test = ["SDD/little_1.txt", "SDD/gates_6.txt", "SDD/nexus_1.txt", "SDD/coupa_1.txt"]
+        files_test = ["SDD/bookstore_6.txt", "SDD/deathCircle_4.txt", "SDD/little_1.txt",
+                      "SDD/gates_6.txt", "SDD/nexus_1.txt", "SDD/coupa_1.txt", "SDD/hyang_14.txt"]
 
         # val_files = ["UCY/students01/students01.txt", "UCY/students01/students03.txt"]
         train_dataset = DatasetFromTxt(path_, files_train, cfg, *args)
