@@ -20,19 +20,22 @@ except:
     from .transformations import Resize, AddBorder, Rotate, Crop
 
 
-
 class DataStructure:
     def __init__(self):
         self.agent_pose = None
         self.agent_pose_av = None
+        self.target = None
+        self.target_av = None
 
         self.neighb_poses = None
         self.neighb_poses_av = None
+        self.neighb_target = None
+        self.neighb_target_av = None
 
         self.img = None
         self.mask = None
-        self.target = None
-        self.target_av = None
+        self.file = None
+
         self.map_affine = None
         self.cropping_points = None
         self.raster_from_agent = None
@@ -51,15 +54,16 @@ class DataStructure:
         self.loc_im_to_glob = None
         self.orig_pixels_hist = None
         self.orig_pixels_future = None
-        self.file = None
 
     def __getitem__(self, ind):
         res = [self.img, self.mask, self.agent_pose, self.agent_pose_av, self.target, self.target_av,
                self.neighb_poses, self.neighb_poses_av, self.raster_from_agent, self.raster_from_world,
                self.world_from_agent, self.agent_from_world,
                self.loc_im_to_glob, self.forces, self.rot_mat,
-               self.cropping_points, self.orig_pixels_hist, self.orig_pixels_future, self.pix_to_m, self.file]
+               self.cropping_points, self.orig_pixels_hist, self.orig_pixels_future, self.pix_to_m, self.file,
+               self.neighb_target, self.neighb_target_av]
         return res[ind]
+
 
 
 def preprocess_data(data, cfg, device="cpu") -> torch.tensor:
@@ -324,6 +328,7 @@ def sdd_crop_and_rotate(img: np.array, path, draw_traj=1, pix_to_m_cfg=SDD_scale
     # mask_pil = ImageOps.expand(mask_pil, (border, border))
 
     angle_deg = trajectory_orientation(path[0], path[1])
+    # angle_deg = 0
     if np.linalg.norm(path[1] - np.array([-1., -1.])) < 1e-6:
         angle_deg = 0
     angle_rad = angle_deg / 180 * math.pi
