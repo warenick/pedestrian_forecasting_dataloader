@@ -235,7 +235,7 @@ class TrajnetLoader:
          :param argsort_inexes: Optional array of integer indices that sort array a into ascending order. They are typically the result of argsort.
          :return: future(target) trajectory of specified agent np.array shape(self.history_len+1,4).
         """
-
+        neighb_indexes = neighb_indexes[neighb_indexes != ped_id]
         file = self.data_files[dataset_ind]
         end_timestamp = timestamp + (
                 self.pred_len / self.delta_t[file[0:file.index("/")]])  # self.delta_t[file[0:file.index("/")]])
