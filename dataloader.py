@@ -58,12 +58,13 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         target_avil, ts = self.get_all_poses_and_masks(
             dataset_index, file, index)
 
-        # neighb_future_avail = (neighb_time_sorted_future[:, :, 0] != -1).astype(int)
+        neighb_future_avail = (neighb_time_sorted_future[:, :, 0] != -1).astype(int)
         img, mask, transform = self.loader.get_map(dataset_index, ped_id, ts)
 
         if not self.cfg["raster_params"]["use_map"]:
             res = self.no_map_prepocessing(agent_future, agent_hist_avail, agent_history, file, forces, hist_avail, img,
-                                           mask, neighb_time_sorted_hist, target_avil)
+                                           mask, neighb_time_sorted_hist, target_avil,
+                                           neighb_future=neighb_time_sorted_future, neighb_future_av=neighb_future_avail)
             return res
 
         # if map:
@@ -106,7 +107,8 @@ class DatasetFromTxt(torch.utils.data.Dataset):
 
                 res = self.crop_and_normilize(agent_future, agent_hist_avail, agent_history, file, hist_avail, img,
                                               target_avil, neighb_time_sorted_hist, forces, mask,
-                                              border_width=self.loader.border_datastes["SDD"], transform=transform)
+                                              border_width=self.loader.border_datastes["SDD"], transform=transform,
+                                              neighb_future=neighb_time_sorted_future, neighb_future_av=neighb_future_avail)
                 # print(os.getpid(), 3, time.time())
 
             else:
@@ -335,7 +337,7 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         return img, mask_pil, pix_to_image, pix_to_m
 
     def no_map_prepocessing(self, agent_future, agent_hist_avail, agent_history, file, forces, hist_avail, img, mask,
-                            neighb_time_sorted_hist, target_avil):
+                            neighb_time_sorted_hist, target_avil, neighb_future, neighb_future_av):
         if "zara" in file:
             pix_to_m = self.cfg["zara_h"]
             agent_history[:, 2:] = transform_points(agent_history[:, 2:], np.linalg.inv(pix_to_m["scale"]))
@@ -378,6 +380,10 @@ class DatasetFromTxt(torch.utils.data.Dataset):
 
         agent_history = transform_points(agent_history[:, 2:], pix_to_m["scale"])
         agent_future = transform_points(agent_future[:, 2:], pix_to_m["scale"])
+        neighb_future = transform_points(neighb_future[:, :,self.loader.coors_row],
+                                                                   pix_to_m["scale"])
+        neighb_time_sorted_hist = transform_points(neighb_time_sorted_hist[:, :,self.loader.coors_row],
+                                                                   pix_to_m["scale"])
         to_localM_transform = np.eye(3)
         if self.cfg["raster_params"]["normalize"]:
             co_operator = ChangeOrigin(new_origin=agent_history[0][:2], rotation=np.eye(2))
@@ -387,15 +393,15 @@ class DatasetFromTxt(torch.utils.data.Dataset):
             to_localM_transform = co_operator.transformation_matrix
         agent_history = transform_points(agent_history, to_localM_transform)
         agent_future = transform_points(agent_future, to_localM_transform)
-        # neighb_time_sorted_future[:,:,2:] -= translation
-        neigh_localM = transform_points(neighb_time_sorted_hist[:, :, self.loader.coors_row],
-                                        co_operator.transformation_matrix @ pix_to_m["scale"])
+        neighb_future = transform_points(neighb_future, to_localM_transform)
+        neigh_localM = transform_points(neighb_time_sorted_hist, to_localM_transform)
+
         raster_from_agent = np.linalg.inv(pix_to_m["scale"]) @ np.linalg.inv(co_operator.transformation_matrix)
         agent_history, neigh_localM = self.calc_speed_accel(agent_history, neigh_localM, agent_hist_avail,
                                                             hist_avail)
         res = [img, mask, agent_history, agent_hist_avail, agent_future, target_avil,
                neigh_localM, hist_avail, raster_from_agent, np.eye(3), np.eye(3), np.eye(3),
-               np.eye(3), forces, None, None]
+               np.eye(3), forces, None, None, None, None, pix_to_m["scale"], file, neighb_future, neighb_future_av]
         return res
 
     def get_all_poses_and_masks(self, dataset_index, file, index):
@@ -410,6 +416,7 @@ class DatasetFromTxt(torch.utils.data.Dataset):
             argsort_inexes = None
         # all agents with ped_id history
         agents_history = self.loader.get_agent_history(dataset_index, ped_id, ts, indexes, argsort_inexes)
+        seen_peds_ds = agents_history[:,0,1]
         # all agents with ped_id future
         agents_future = self.loader.get_agent_future(dataset_index, ped_id, ts, indexes, argsort_inexes)
         # current agent (to be predicted) history
@@ -431,7 +438,8 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         agent_hist_avail = (agent_history[:, 0] != -1).astype(int)
         target_avil = (agent_future[:, 0] != -1).astype(int)
         hist_avail = (neighb_time_sorted_hist[:, :, 0] != -1).astype(int)
-        return agent_future, agent_hist_avail, agent_history, forces, hist_avail, neighb_time_sorted_future, neighb_time_sorted_hist, ped_id, target_avil, ts
+        return agent_future, agent_hist_avail, agent_history, forces, hist_avail, neighb_time_sorted_future,\
+               neighb_time_sorted_hist, ped_id, target_avil, ts
 
     def calc_speed_accel(self, agent_history, neigh_localM, agent_history_av, neigh_localM_av):
         real_agent_history = 1 * agent_history
@@ -456,8 +464,10 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         return agent_history, neigh_localM
 
     def crop_and_normilize(self, agent_future, agent_hist_avail, agent_history, file, hist_avail, img, target_avil,
-                           time_sorted_hist, forces, mask, border_width, transform):
+                           time_sorted_hist, forces, mask, border_width, transform, neighb_future=None,
+                           neighb_future_av=None):
         output = DataStructure()
+        output.neighb_target_av = neighb_future_av
         # rotate in a such way that last hisory points are horizontal (elft to right),
         # crop to spec in cfg area and resize
         #  calcultate transformation matrixes for pix to meters
@@ -593,6 +603,9 @@ class DatasetFromTxt(torch.utils.data.Dataset):
                                         # np.linalg.inv(scale) @ agent_from_raster @ scale @ tl_co_operator.transformation_matrix @ rotation_matrix @ transform)
                                         agent_from_glob_raster)
 
+        neighb_future_localM = transform_points(neighb_future[:, :, self.loader.coors_row], agent_from_glob_raster)
+
+
         target_localM = transform_points(agent_future[:, self.loader.coors_row],
                                          # pix_to_m @ intermidiate_to_locraster @ transform) - agent_hist_M[0]
                                          # np.linalg.inv(scale) @ agent_from_raster @ scale @ tl_co_operator.transformation_matrix @ rotation_matrix @ transform)
@@ -601,9 +614,11 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         agent_hist_localM, neigh_localM = self.calc_speed_accel(agent_hist_localM, neigh_localM, agent_hist_avail,
                                                                 hist_avail)
 
+        output.agent_pose = agent_hist_localM
         output.target = target_localM
         output.neighb_poses = neigh_localM
-        output.agent_pose = agent_hist_localM
+        output.neighb_target = neighb_future_localM
+
 
         # res = [img.astype(np.uint8), mask, agent_hist_localM, agent_hist_avail, target_localM, target_avil,
         #        neigh_localM,
@@ -630,7 +645,7 @@ class NeighboursHistory:
     def get_history(self):
         poses = []
         for batch in range(self.bs):
-            poses.append([self.history_agents[batch][i] for i in range(1, len(self.history_agents[batch]))])
+            poses.append([self.history_agents[batch][i] for i in range(0, len(self.history_agents[batch]))])
         return poses
 
 
@@ -686,11 +701,18 @@ class UnifiedInterface:
         self.history_agents = NeighboursHistory([(data[i][6]) for i in range(len(data))]).get_history()
         # self.history_agents = NeighboursHistory([(data[i]["neighb"]) for i in range(len(data))]).get_history()
 
-        self.history_agents_avail = np.array([item[7] for item in data])
+        self.history_agents_avail = np.array([item[7] for item in data], dtype=object)
         # self.history_agents_avail = [np.array(data[i]["neighb_avail"]) for i in range(len(data))]
 
         self.tgt = np.array([item[4] for item in data])
         # self.tgt = np.stack([np.array(data[i]["target"]) for i in range(len(data))], axis=0)
+
+        self.neighb_tgt = None
+        self.neighb_tgt_av = None
+        if data[0][20] is not None:
+            self.neighb_tgt = NeighboursHistory([(data[i][20]) for i in range(len(data))]).get_history()
+            self.neighb_tgt_av = np.array([item[21] for item in data], dtype=object)
+
         self.tgt_avail = np.array([item[5] for item in data])
         # self.tgt_avail = np.stack([np.array(data[i]["target_avil"]) for i in range(len(data))], axis=0)
 
