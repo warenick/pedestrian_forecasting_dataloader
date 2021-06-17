@@ -152,12 +152,12 @@ if __name__ == "__main__":
     cfg["raster_params"]["normalize"] = True
     cfg["raster_params"]["use_segm"] = True
 
+    test_speed_no_imgs()
     test_speed_img_segm_area_local_meters()
     test_speed_img_area_local_meters_preproc()
     test_speed_img_area_local_meters()
-    test_speed_no_imgs()
     test_speed_no_imgs_no_norm()
-    #
+
     # cfg["raster_params"]["use_map"] = True
     # cfg["raster_params"]["normalize"] = False
     # cfg["raster_params"]["use_segm"] = False

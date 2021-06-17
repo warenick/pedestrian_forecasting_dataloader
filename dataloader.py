@@ -10,7 +10,7 @@ try:
     from utils import trajectory_orientation, rotate_image, DataStructure
     from utils import sdd_crop_and_rotate, transform_points
     from config import cfg
-    from transformations import ChangeOrigin
+    from transformations import ChangeOrigin, Rotate
 except ImportError:
     # relative import
     from .force_from_txt import Force_from_txt
@@ -19,7 +19,7 @@ except ImportError:
     from .utils import trajectory_orientation, rotate_image
     from .utils import sdd_crop_and_rotate, transform_points, DataStructure
     from .config import cfg
-    from .transformations import ChangeOrigin
+    from .transformations import ChangeOrigin, Rotate
 
 import math
 from tqdm import tqdm
@@ -386,8 +386,12 @@ class DatasetFromTxt(torch.utils.data.Dataset):
                                                                    pix_to_m["scale"])
         to_localM_transform = np.eye(3)
         if self.cfg["raster_params"]["normalize"]:
+            angle_deg = trajectory_orientation(agent_history[0][:2], agent_history[1][:2])
+            if agent_hist_avail[1] == 0:
+                angle_deg = 0
             co_operator = ChangeOrigin(new_origin=agent_history[0][:2], rotation=np.eye(2))
-            to_localM_transform = co_operator.transformation_matrix
+            r_operator = Rotate(angle=angle_deg, rot_center=agent_history[0][:2])
+            to_localM_transform = co_operator.transformation_matrix @ r_operator.transformation_matrix
         else:
             co_operator = ChangeOrigin(new_origin=np.array([0., 0]), rotation=np.eye(2))
             to_localM_transform = co_operator.transformation_matrix
@@ -654,7 +658,17 @@ import time
 
 class UnifiedInterface:
     def __init__(self, data):
-        # return None
+        """
+
+        :param data: List of list
+        example:
+        data[0] = [img.astype(np.uint8), mask, agent_hist_localM, agent_hist_avail, target_localM, target_avil,
+               neigh_localM, hist_avail, np.linalg.inv(agent_from_raster), raster_from_world, world_from_agent,
+               agent_from_world, np.linalg.inv(pix_to_m) @ world_from_raster,
+               transform_points(forces, rotation_matrix_cropped), rotation_matrix_cropped, np.array([tl_x_intermidiate,
+               tl_y_intermidiate, br_x_intermidiate, br_y_intermidiate]), agent_history[:, self.loader.coors_row],
+               agent_future[:, self.loader.coors_row], pix_to_m, file]
+        """
         st = time.time()
         if data[0][0] is None:
             self.image = None
@@ -779,7 +793,7 @@ class UnifiedInterface:
                         ff.format(self.history_agents[batch][neigh][step][1])+sp+\
                         str(self.history_agents_avail[batch][neigh][step])+sn
         return output
-                
+
 
 
 
