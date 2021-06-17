@@ -26,9 +26,10 @@ from tqdm import tqdm
 # import matplotlib.pyplot as plt
 # import os
 
+np.random.seed(seed=42)
+
 
 class DatasetFromTxt(torch.utils.data.Dataset):
-
     def __init__(self, path, files, cfg_=None, use_forces=False, forces_file=None):
         super(DatasetFromTxt, self).__init__()
         self.loader = TrajnetLoader(path, files, cfg_)
@@ -57,6 +58,14 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         neighb_time_sorted_future, neighb_time_sorted_hist, ped_id,        \
         target_avil, ts = self.get_all_poses_and_masks(
             dataset_index, file, index)
+
+        assert agent_future.shape == (12, 4)  #time_hor, (ts, ped_id, pose_x, pose_y)
+        assert target_avil.shape == (12,)  # time_hor
+        assert agent_history.shape == (8, 4)
+        assert agent_hist_avail.shape == (8, )  # time_hor
+        assert neighb_time_sorted_future.ndim == 3
+        assert neighb_time_sorted_future.shape[1:] == (12, 4)
+        assert neighb_time_sorted_hist.shape[1:] == (8, 4)
 
         neighb_future_avail = (neighb_time_sorted_future[:, :, 0] != -1).astype(int)
         img, mask, transform = self.loader.get_map(dataset_index, ped_id, ts)
@@ -801,314 +810,16 @@ class UnifiedInterface:
 def collate_wrapper(batch):
     return UnifiedInterface(batch)
 
-#
-# if __name__ == "__main__":
-#     pass
-#     path_ = "/media/robot/hdd1/hdd_repos/pedestrian_forecasting_dataloader/data/train/"
-#     # cfg["raster_params"]["use_map"] = True
-#     # cfg["raster_params"]["normalize"] = False
-#     # # files = ["eth_hotel/eth_hotel.txt",
-#     # #         #"biwi_eth/biwi_eth.txt",
-#     # #          # "crowds/crowds_zara02.txt", "crowds/crowds_zara03.txt", "crowds/students001.txt",
-#     # #          # "crowds/students003.txt",
-#     # #          # "stanford/bookstore_0.txt", "stanford/bookstore_1.txt",
-#     # #          # "stanford/bookstore_2.txt", "stanford/bookstore_3.txt",
-#     # #          # "stanford/coupa_3.txt",
-#     # #          # "stanford/deathCircle_0.txt",
-#     # #          ]
-#     # # #
-#     # # dataset = DatasetFromTxt(path_, files, cfg)
-#     # # img = dataset[0]["img"]
-#     # # # TODO: plot all trajes
-#     # # img_pil = Image.fromarray(np.asarray(img, dtype="uint8"))
-#     # # img_pil = img_pil.resize([int(720*2), int(576*2)])
-#     # # img_pil = img_pil.rotate(90, center=(img_pil.size[0]/2, img_pil.size[1]/2))
-#     # # bord = 600
-#     # # img_pil = ImageOps.expand(img_pil, (bord, bord))
-#     # # draw = ImageDraw.Draw(img_pil)
-#     # # R = 2
-#     # # pix_to_image = dataset.cfg["eth_hotel_pix_to_image_cfg"]
-#     # # pix_to_m = dataset.cfg['eth_hotel_h']
-#     # # for i in range(0, len(dataset), 2):
-#     # #     # ind = int(1000 * torch.rand(1).item())
-#     # #     data = dataset[i]
-#     # #     agent_history = data["agent_hist"][:, :2]
-#     # #     agent_history = transform_points(agent_history, np.linalg.inv(pix_to_m["scale"]))
-#     # #     # agent_history = np.flip(agent_history, axis=1)
-#     # #     for number, pose in enumerate(agent_history):
-#     # #         if data["agent_hist_avail"][number]:
-#     # #             draw.ellipse((pix_to_image["coef_x"] * pose[0] - R + pix_to_image["displ_x"] + bord,
-#     # #                           pix_to_image["coef_y"] * pose[1] - R + pix_to_image["displ_y"] + bord,
-#     # #                           pix_to_image["coef_x"] * pose[0] + R + pix_to_image["displ_x"] + bord,
-#     # #                           pix_to_image["coef_y"] * pose[1] + R + pix_to_image["displ_y"] + bord
-#     # #                           ), fill='blue', outline='blue')
-#     # #
-#     # # img_pil.show()
-#     #
-#     #
-#     # files = [  # "biwi_eth/biwi_eth.txt",
-#     #     "crowds/crowds_zara02.txt", "crowds/crowds_zara03.txt", "crowds/students001.txt",
-#     #     # "crowds/students003.txt",
-#     #     # "stanford/bookstore_0.txt", "stanford/bookstore_1.txt",
-#     #     # "stanford/bookstore_2.txt", "stanford/bookstore_3.txt",
-#     #     # "stanford/coupa_3.txt",
-#     #     # "stanford/deathCircle_0.txt",
-#     # ]
-#     # dataset = DatasetFromTxt(path_, files, cfg)
-#     # for _ in range(100):
-#     #     ind = int(1000 * torch.rand(1).item())
-#     #     data = dataset[ind]
-#     #
-#     # files = [  # "biwi_eth/biwi_eth.txt",
-#     #     # "crowds/crowds_zara02.txt", "crowds/crowds_zara03.txt", "crowds/students001.txt",
-#     #     # "crowds/students003.txt",
-#     #     "stanford/bookstore_0.txt", "stanford/bookstore_1.txt",
-#     #     # "stanford/bookstore_2.txt", "stanford/bookstore_3.txt",
-#     #     # "stanford/coupa_3.txt",
-#     #     # "stanford/deathCircle_0.txt",
-#     # ]
-#     # dataset = DatasetFromTxt(path_, files, cfg)
-#     # ind = int(1000 * torch.rand(1).item())
-#     # data = dataset[ind]
-#     #
-#     # cfg["raster_params"]["use_map"] = True
-#     # cfg["raster_params"]["normalize"] = False
-#     # files = ["biwi_eth/biwi_eth.txt",
-#     #          # "crowds/crowds_zara02.txt", "crowds/crowds_zara03.txt", "crowds/students001.txt",
-#     #          # "crowds/students003.txt",
-#     #          # "stanford/bookstore_0.txt", "stanford/bookstore_1.txt",
-#     #          # "stanford/bookstore_2.txt", "stanford/bookstore_3.txt",
-#     #          # "stanford/coupa_3.txt",
-#     #          # "stanford/deathCircle_0.txt",
-#     #          ]
-#     # # dataset = DatasetFromTxt(path_, files, cfg)
-#     # # ind = int(1000 * torch.rand(1).item())
-#     # # data = dataset[ind]
-#     #
-#     # files = [  # "biwi_eth/biwi_eth.txt",
-#     #     "crowds/crowds_zara02.txt", "crowds/crowds_zara03.txt", "crowds/students001.txt",
-#     #     # "crowds/students003.txt",
-#     #     # "stanford/bookstore_0.txt", "stanford/bookstore_1.txt",
-#     #     # "stanford/bookstore_2.txt", "stanford/bookstore_3.txt",
-#     #     # "stanford/coupa_3.txt",
-#     #     # "stanford/deathCircle_0.txt",
-#     # ]
-#     # dataset = DatasetFromTxt(path_, files, cfg)
-#     # ind = int(1000 * torch.rand(1).item())
-#     # data = dataset[ind]
-#     #
-#     # files = [  # "biwi_eth/biwi_eth.txt",
-#     #     # "crowds/crowds_zara02.txt", "crowds/crowds_zara03.txt", "crowds/students001.txt",
-#     #     # "crowds/students003.txt",
-#     #     "stanford/bookstore_0.txt", "stanford/bookstore_1.txt",
-#     #     # "stanford/bookstore_2.txt", "stanford/bookstore_3.txt",
-#     #     # "stanford/coupa_3.txt",
-#     #     # "stanford/deathCircle_0.txt",
-#     # ]
-#     # dataset = DatasetFromTxt(path_, files, cfg)
-#     # ind = int(1000 * torch.rand(1).item())
-#     # data = dataset[ind]
-#     #
-#     # cfg["raster_params"]["use_map"] = False
-#     # cfg["raster_params"]["normalize"] = True
-#     # files = ["biwi_eth/biwi_eth.txt",
-#     #          # "crowds/crowds_zara02.txt", "crowds/crowds_zara03.txt", "crowds/students001.txt",
-#     #          # "crowds/students003.txt",
-#     #          # "stanford/bookstore_0.txt", "stanford/bookstore_1.txt",
-#     #          # "stanford/bookstore_2.txt", "stanford/bookstore_3.txt",
-#     #          # "stanford/coupa_3.txt",
-#     #          # "stanford/deathCircle_0.txt",
-#     #          ]
-#     # dataset = DatasetFromTxt(path_, files, cfg)
-#     # ind = int(1000 * torch.rand(1).item())
-#     # data = dataset[ind]
-#     #
-#     # files = [  # "biwi_eth/biwi_eth.txt",
-#     #     "crowds/crowds_zara02.txt", "crowds/crowds_zara03.txt", "crowds/students001.txt",
-#     #     # "crowds/students003.txt",
-#     #     # "stanford/bookstore_0.txt", "stanford/bookstore_1.txt",
-#     #     # "stanford/bookstore_2.txt", "stanford/bookstore_3.txt",
-#     #     # "stanford/coupa_3.txt",
-#     #     # "stanford/deathCircle_0.txt",
-#     # ]
-#     # dataset = DatasetFromTxt(path_, files, cfg)
-#     # ind = int(1000 * torch.rand(1).item())
-#     # data = dataset[ind]
-#     #
-#     # files = [  # "biwi_eth/biwi_eth.txt",
-#     #     # "crowds/crowds_zara02.txt", "crowds/crowds_zara03.txt", "crowds/students001.txt",
-#     #     # "crowds/students003.txt",
-#     #     "stanford/bookstore_0.txt", "stanford/bookstore_1.txt",
-#     #     # "stanford/bookstore_2.txt", "stanford/bookstore_3.txt",
-#     #     # "stanford/coupa_3.txt",
-#     #     # "stanford/deathCircle_0.txt",
-#     # ]
-#     # dataset = DatasetFromTxt(path_, files, cfg)
-#     # ind = int(1000 * torch.rand(1).item())
-#     # data = dataset[ind]
-#     #
-#     # cfg["raster_params"]["use_map"] = False
-#     # cfg["raster_params"]["normalize"] = False
-#     # files = ["biwi_eth/biwi_eth.txt",
-#     #          # "crowds/crowds_zara02.txt", "crowds/crowds_zara03.txt", "crowds/students001.txt",
-#     #          # "crowds/students003.txt",
-#     #          # "stanford/bookstore_0.txt", "stanford/bookstore_1.txt",
-#     #          # "stanford/bookstore_2.txt", "stanford/bookstore_3.txt",
-#     #          # "stanford/coupa_3.txt",
-#     #          # "stanford/deathCircle_0.txt",
-#     #          ]
-#     # dataset = DatasetFromTxt(path_, files, cfg)
-#     # ind = int(1000 * torch.rand(1).item())
-#     # data = dataset[ind]
-#     #
-#     # files = [  # "biwi_eth/biwi_eth.txt",
-#     #     "crowds/crowds_zara02.txt", "crowds/crowds_zara03.txt", "crowds/students001.txt",
-#     #     # "crowds/students003.txt",
-#     #     # "stanford/bookstore_0.txt", "stanford/bookstore_1.txt",
-#     #     # "stanford/bookstore_2.txt", "stanford/bookstore_3.txt",
-#     #     # "stanford/coupa_3.txt",
-#     #     # "stanford/deathCircle_0.txt",
-#     # ]
-#     # dataset = DatasetFromTxt(path_, files, cfg)
-#     # ind = int(1000 * torch.rand(1).item())
-#     # data = dataset[ind]
-#     #
-#     # files = [  # "biwi_eth/biwi_eth.txt",
-#     #     # "crowds/crowds_zara02.txt", "crowds/crowds_zara03.txt", "crowds/students001.txt",
-#     #     # "crowds/students003.txt",
-#     #     "stanford/bookstore_0.txt", "stanford/bookstore_1.txt",
-#     #     # "stanford/bookstore_2.txt", "stanford/bookstore_3.txt",
-#     #     # "stanford/coupa_3.txt",
-#     #     # "stanford/deathCircle_0.txt",
-#     # ]
-#     # dataset = DatasetFromTxt(path_, files, cfg)
-#     # ind = int(1000 * torch.rand(1).item())
-#     # data = dataset[ind]
-#
-#     cfg["raster_params"]["use_map"] = True
-#     cfg["raster_params"]["normalize"] = True
-#     cfg["raster_params"]["use_segm"] = True
-#
-#     files = [  # "biwi_eth/biwi_eth.txt",
-#         "SDD/bookstore_0.txt", "SDD/coupa_1.txt", "SDD/deathCircle_4.txt", "SDD/gates_1.txt"
-#         # "crowds/students001.txt",        "crowds/students003.txt",
-#         # "stanford/bookstore_0.txt", "stanford/bookstore_1.txt",
-#         # "stanford/bookstore_2.txt", "stanford/bookstore_3.txt",
-#         # "stanford/coupa_3.txt",
-#         # "stanford/deathCircle_0.txt",
-#     ]
-#     import matplotlib.pyplot as plt
-#
-#     # fig, axs = plt.subplots(2, 2, tight_layout=True)
-#
-#     dataset = DatasetFromTxt(path_, files, cfg)
-#     dataloader = DataLoader(dataset, batch_size=32,
-#                             shuffle=True, num_workers=0, collate_fn=collate_wrapper)
-#
-#     threshold = 200
-#     speeds_sdd = np.zeros(0)
-#     for i, data in enumerate((dataloader)):
-#         speed = np.linalg.norm(data.history_positions[:, :, 2:4], axis=2)[data.history_av == 1].reshape(-1)
-#         speeds_sdd = np.concatenate((speeds_sdd, speed[speed > 1e-6]))
-#         if i > threshold:
-#             print("crowds speed average:", np.mean(speeds_sdd))
-#             break
-#     n_bins = 500
-#     plt.hist(speeds_sdd, n_bins, alpha=0.5, label='speeds_sdd')
-#     # plt.hist(speeds_biwi_eth, n_bins, alpha=0.5, label='speeds_biwi_eth')
-#     # plt.hist(speeds_stanford, n_bins, alpha=0.5, label='speeds_stanford')
-#     # plt.hist(speeds_students, n_bins, alpha=0.5, label='speeds_students')
-#     # plt.hist(speeds_eth_hot, n_bins, alpha=0.5, label='speeds_eth_hot')
-#
-#     plt.legend(loc='upper right')
-#     plt.savefig('sdd.png')
-#     plt.show()
-#     exit()
-#     cfg["raster_params"]["use_map"] = False
-#     cfg["raster_params"]["normalize"] = False
-#     files = [
-#         # "crowds/crowds_zara02.txt", "crowds/crowds_zara03.txt",
-#         "UCY/students01/students01.txt",
-#     ]
-#     dataset = DatasetFromTxt(path_, files, cfg)
-#
-#     dataloader = DataLoader(dataset, batch_size=128,
-#                             shuffle=False, num_workers=8, collate_fn=collate_wrapper)
-#
-#     speeds_students = np.zeros(0)
-#     for i, data in enumerate((dataloader)):
-#         speed = np.linalg.norm(data.history_positions[:, :, 2:4], axis=2)[data.history_av == 1].reshape(-1)
-#         speeds_students = np.concatenate((speeds_students, speed[speed > 1e-6]))
-#         if i > threshold:
-#             print("crowds wo_norm speed average:", np.mean(speeds_students))
-#             break
-#
-#     cfg["raster_params"]["use_map"] = False
-#     cfg["raster_params"]["normalize"] = False
-#     files = [
-#         # "crowds/crowds_zara02.txt", "crowds/crowds_zara03.txt",
-#         "eth_hotel/eth_hotel.txt"
-#     ]
-#     dataset = DatasetFromTxt(path_, files, cfg)
-#
-#     dataloader = DataLoader(dataset, batch_size=128,
-#                             shuffle=False, num_workers=8, collate_fn=collate_wrapper)
-#
-#     speeds_eth_hot = np.zeros(0)
-#     for i, data in enumerate((dataloader)):
-#         speed = np.linalg.norm(data.history_positions[:, :, 2:4], axis=2)[data.history_av == 1].reshape(-1)
-#         speeds_eth_hot = np.concatenate((speeds_eth_hot, speed[speed > 1e-6]))
-#         if i > threshold:
-#             print("eth_hotel wo_norm speed average:", np.mean(speeds_eth_hot))
-#             break
-#
-#     cfg["raster_params"]["use_map"] = False
-#     cfg["raster_params"]["normalize"] = False
-#     files = ["biwi_eth/biwi_eth.txt"]
-#     dataset = DatasetFromTxt(path_, files, cfg)
-#     dataloader = DataLoader(dataset, batch_size=128,
-#                             shuffle=False, num_workers=8, collate_fn=collate_wrapper)
-#     speeds_biwi_eth = np.zeros(0)
-#     for i, data in enumerate(dataloader):
-#         speed = np.linalg.norm(data.history_positions[:, :, 2:4], axis=2)[data.history_av == 1].reshape(-1)
-#         speeds_biwi_eth = np.concatenate((speeds_biwi_eth, speed[speed > 1e-6]))
-#         if i > threshold:
-#             print("biwi_eth speed average:", np.mean(speeds_biwi_eth))
-#             break
-#
-#     cfg["raster_params"]["use_map"] = False
-#     cfg["raster_params"]["normalize"] = False
-#     files = [  # "biwi_eth/biwi_eth.txt",
-#         # "crowds/crowds_zara02.txt", "crowds/crowds_zara03.txt", "crowds/students001.txt",
-#         # "crowds/students003.txt",
-#         "SDD/bookstore_0.txt", "SDD/bookstore_1.txt",
-#         "SDD/bookstore_2.txt", "SDD/bookstore_3.txt",
-#         "SDD/coupa_3.txt",
-#         "SDD/deathCircle_0.txt",
-#     ]
-#     dataset = DatasetFromTxt(path_, files, cfg)
-#
-#     dataloader = DataLoader(dataset, batch_size=128,
-#                             shuffle=False, num_workers=8, collate_fn=collate_wrapper)
-#
-#     speeds_stanford = np.zeros(0)
-#     for i, data in enumerate(tqdm(dataloader)):
-#         speed = np.linalg.norm(data.history_positions[:, :, 2:4], axis=2)[data.history_av == 1].reshape(-1)
-#         speeds_stanford = np.concatenate((speeds_stanford, speed[speed > 1e-6]))
-#         if i > threshold:
-#             print("stanf speed average:", np.mean(speed))
-#             break
-#     n_bins = 20
-#
-#     plt.hist(speeds_zara, n_bins, alpha=0.5, label='speeds_zara')
-#     plt.hist(speeds_biwi_eth, n_bins, alpha=0.5, label='speeds_biwi_eth')
-#     plt.hist(speeds_stanford, n_bins, alpha=0.5, label='speeds_stanford')
-#     plt.hist(speeds_students, n_bins, alpha=0.5, label='speeds_students')
-#     plt.hist(speeds_eth_hot, n_bins, alpha=0.5, label='speeds_eth_hot')
-#
-#     plt.legend(loc='upper right')
-#     plt.savefig('foo.png')
-#     plt.show()
-#
-#     # plt.savefig('foo.png')
-#     pass
+
+if __name__ == "__main__":
+    path = "/media/robot/hdd1/hdd_repos/pedestrian_forecasting_dataloader/data/train/"
+    cfg["one_ped_one_traj"] = False
+    files = ["biwi_eth/biwi_eth.txt",
+             # "UCY/zara02/zara02.txt",
+             # "UCY/zara03/zara03.txt",
+             # "UCY/students01/students01.txt",
+             # "UCY/students03/students03.txt",
+             ]
+    dataset = DatasetFromTxt(path, files, cfg_=cfg)
+    data = dataset[0]
+
