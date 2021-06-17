@@ -11,7 +11,7 @@ except:
 class TrajnetLoader:
 
     def __init__(self, path, data_files, cfg):
-
+        self.stochastic = False
         self.data_files = data_files
         self.path = path
         self.dataset_index = []
@@ -302,7 +302,10 @@ class TrajnetLoader:
 
             # start_from_index = num_of_observations // 20 * 8 #min(num_of_observations, 8)
             if num_of_observations > 2:
-                start_from_index = np.random.randint(1, num_of_observations-1)
+                if self.stochastic:
+                    start_from_index = np.random.randint(1, num_of_observations-1)
+                if not self.stochastic:
+                    start_from_index = num_of_observations//2
             else:
                 start_from_index=0
             ts = self.data[file][self.data[file][:, 1] == ped_id][start_from_index, 0]
@@ -321,39 +324,44 @@ class TrajnetLoader:
          :param timestamp:  timestamp from txt file. Target future is [timespemp, timespemp + pred_len]
          :return:
         """
-        img = None
-        if self.cfg["raster_params"]["use_map"]:
-            txt_file = self.data_files[dataset_ind]
-            if ("eth" not in txt_file) and ("UCY" not in txt_file):
-                img_file = self.path + txt_file[0:txt_file.index(".")] + ".jpg"
-                if self.cfg["raster_params"]["use_segm"]:
-                    segm_file = self.path + txt_file[0:txt_file.index(".")] + "_s.npy"
-            else:
-                img_file = self.path + txt_file[0:txt_file.index(".")] + ".png"
-                if self.cfg["raster_params"]["use_segm"]:
-                    segm_file = self.path + txt_file[0:txt_file.index(".")] + "_s.npy"
 
-            if img_file not in self.loaded_imgs.keys():
-                print("run_time loading!")
-                img = cv2.imread(img_file).astype(np.int16)
-                if "SDD" in img_file:
-                    img = cv2.resize(img, (img.shape[1]//5, img.shape[0]//5), interpolation=0)
-                self.loaded_imgs[img_file] = img
-            segm = None
-            if self.cfg["raster_params"]["use_segm"]:
-                if segm_file not in self.loaded_imgs.keys():
-                    print("run_time loading!")
-                    segm = np.load(segm_file)
-                    if "SDD" in img_file:
-                        segm = cv2.resize(segm, (segm.shape[1] // 5, segm.shape[0] // 5), interpolation=0)
-                    self.loaded_imgs[segm_file] = segm
+        if not self.cfg["raster_params"]["use_map"]:
+            return None, None, np.eye(3)
 
-            # img = Image.open(img_file)
-            # img = np.asarray(img, dtype="int32")
-            if self.cfg["raster_params"]["use_segm"]:
-                return np.copy(self.loaded_imgs[img_file]), np.copy(self.loaded_imgs[segm_file]), self.img_transf[img_file]
-            else:
-                return np.copy(self.loaded_imgs[img_file]), None, self.img_transf[img_file]
-        return None, None, np.eye(3)
+
+        txt_file = self.data_files[dataset_ind]
+
+        if self.cfg["raster_params"]["use_segm"]:
+            segm_file = self.path + txt_file[0:txt_file.index(".")] + "_s.npy"
+
+        if "SDD" in txt_file:
+            img_type = ".jpg"
+        else:
+            img_type = ".png"
+
+
+        img_file = self.path + txt_file[0:txt_file.index(".")] + img_type
+
+        if img_file not in self.loaded_imgs.keys():
+            raise Exception("run time loading!")
+            # img = cv2.imread(img_file).astype(np.int16)
+            # if "SDD" in img_file:
+            #     img = cv2.resize(img, (img.shape[1]//5, img.shape[0]//5), interpolation=0)
+            # self.loaded_imgs[img_file] = img
+
+        segm = None
+        if self.cfg["raster_params"]["use_segm"]:
+            if segm_file not in self.loaded_imgs.keys():
+                raise Exception("run time loading!")
+                # segm = np.load(segm_file)
+                # if "SDD" in img_file:
+                #     segm = cv2.resize(segm, (segm.shape[1] // 5, segm.shape[0] // 5), interpolation=0)
+                # self.loaded_imgs[segm_file] = segm
+
+        if self.cfg["raster_params"]["use_segm"]:
+            return np.copy(self.loaded_imgs[img_file]), np.copy(self.loaded_imgs[segm_file]), self.img_transf[img_file]
+
+        return np.copy(self.loaded_imgs[img_file]), None, self.img_transf[img_file]
+
 
 
