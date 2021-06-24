@@ -23,7 +23,8 @@ except ImportError:
 
 import math
 from tqdm import tqdm
-# import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
+
 # import os
 
 np.random.seed(seed=42)
@@ -55,14 +56,14 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         file = self.files[dataset_index]
 
         agent_future, agent_hist_avail, agent_history, forces, hist_avail, \
-        neighb_time_sorted_future, neighb_time_sorted_hist, ped_id,        \
+        neighb_time_sorted_future, neighb_time_sorted_hist, ped_id, \
         target_avil, ts = self.get_all_poses_and_masks(
             dataset_index, file, index)
 
-        assert agent_future.shape == (12, 4)  #time_hor, (ts, ped_id, pose_x, pose_y)
+        assert agent_future.shape == (12, 4)  # time_hor, (ts, ped_id, pose_x, pose_y)
         assert target_avil.shape == (12,)  # time_hor
         assert agent_history.shape == (8, 4)
-        assert agent_hist_avail.shape == (8, )  # time_hor
+        assert agent_hist_avail.shape == (8,)  # time_hor
         assert neighb_time_sorted_future.ndim == 3
         assert neighb_time_sorted_future.shape[1:] == (12, 4)
         assert neighb_time_sorted_hist.shape[1:] == (8, 4)
@@ -73,61 +74,26 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         if not self.cfg["raster_params"]["use_map"]:
             res = self.no_map_prepocessing(agent_future, agent_hist_avail, agent_history, file, forces, hist_avail, img,
                                            mask, neighb_time_sorted_hist, target_avil,
-                                           neighb_future=neighb_time_sorted_future, neighb_future_av=neighb_future_avail)
+                                           neighb_future=neighb_time_sorted_future,
+                                           neighb_future_av=neighb_future_avail)
             return res
 
-        # if map:
-        if "UCY" in file or "eth" in file:
-            img, mask_pil, pix_to_image, pix_to_m = self.get_ucy_eth_img_mask_scale(agent_future, agent_history, file,
-                                                                                    img, mask, neighb_time_sorted_hist)
+        if self.cfg["raster_params"]["normalize"]:
 
-            if self.cfg["raster_params"]["normalize"]:
-                res = self.normilized_img_ucy_eth(agent_future, agent_hist_avail, agent_history, file, forces,
-                                                  hist_avail, img, mask, mask_pil, neighb_time_sorted_hist,
-                                                  pix_to_image, pix_to_m, target_avil)
-                return res
+            res = self.crop_and_normilize(agent_future, agent_hist_avail, agent_history, file, hist_avail, img,
+                                          target_avil, neighb_time_sorted_hist, forces, mask,
+                                          border_width=self.loader.border_datastes["SDD"], transform=transform,
+                                          neighb_future=neighb_time_sorted_future, neighb_future_av=neighb_future_avail)
+            # print(os.getpid(), 3, time.time())
 
-            else:
-                agent_history, neighb_time_sorted_hist = self.calc_speed_accel(agent_history, neighb_time_sorted_hist,
-                                                                               agent_hist_avail,
-                                                                               hist_avail)
+        else:
 
-                res = {"img": img,
-                       "segm": mask,
-                       "agent_hist": agent_history[:, self.loader.coors_row],
-                       "agent_hist_avail": agent_hist_avail,
-                       "target": agent_future[:, self.loader.coors_row],
-                       "target_avil": target_avil,
-                       "neighb": neighb_time_sorted_hist,
-                       "neighb_avail": hist_avail,
-                       "glob_to_local": None,
-                       "image_to_local": None,
-                       "raster_from_agent": None,
-                       "raster_from_world": None,  # raster_from_world,
-                       "world_from_agent": None,  # world_from_agent,
-                       "agent_from_world": None,  # agent_from_world
-                       "loc_im_to_glob": None,
-                       "forces": forces
-                       }
-                return res
+            file, res = self.ssd_unnorm_image(agent_future, agent_hist_avail, agent_history, file, forces,
+                                              hist_avail, img, mask, neighb_time_sorted_future,
+                                              neighb_time_sorted_hist, target_avil, transform)
 
-        if ("stanford" in file) or ("SDD" in file):
-            if self.cfg["raster_params"]["normalize"]:
-
-                res = self.crop_and_normilize(agent_future, agent_hist_avail, agent_history, file, hist_avail, img,
-                                              target_avil, neighb_time_sorted_hist, forces, mask,
-                                              border_width=self.loader.border_datastes["SDD"], transform=transform,
-                                              neighb_future=neighb_time_sorted_future, neighb_future_av=neighb_future_avail)
-                # print(os.getpid(), 3, time.time())
-
-            else:
-
-                file, res = self.ssd_unnorm_image(agent_future, agent_hist_avail, agent_history, file, forces,
-                                                  hist_avail, img, mask, neighb_time_sorted_future,
-                                                  neighb_time_sorted_hist, target_avil, transform)
-
-            # res.append(file)
-            return res
+        # res.append(file)
+        return res
 
     def ssd_unnorm_image(self, agent_future, agent_hist_avail, agent_history, file, forces, hist_avail, img, mask,
                          neighb_time_sorted_future, neighb_time_sorted_hist, target_avil, transform):
@@ -170,12 +136,13 @@ class DatasetFromTxt(torch.utils.data.Dataset):
 
     def normilized_img_ucy_eth(self, agent_future, agent_hist_avail, agent_history, file, forces, hist_avail, img, mask,
                                mask_pil, neighb_time_sorted_hist, pix_to_image, pix_to_m, target_avil):
+        border_width = 0
         img_pil = Image.fromarray(np.asarray(img, dtype="uint8"))
-        border_width = int(abs(img_pil.size[0] - img_pil.size[1]) * 1.5)
-        img_pil = ImageOps.expand(img_pil, (border_width, border_width))
+        # border_width = int(abs(img_pil.size[0] - img_pil.size[1]) * 1.5)
+        # img_pil = ImageOps.expand(img_pil, (border_width, border_width))
         if mask is not None:
             mask_pil = Image.fromarray(np.asarray(mask, dtype="uint8"))
-            mask_pil = ImageOps.expand(mask_pil, (border_width, border_width))
+            # mask_pil = ImageOps.expand(mask_pil, (border_width, border_width))
         if self.cfg["raster_params"]["draw_hist"]:
 
             draw = ImageDraw.Draw(img_pil)
@@ -389,10 +356,10 @@ class DatasetFromTxt(torch.utils.data.Dataset):
 
         agent_history = transform_points(agent_history[:, 2:], pix_to_m["scale"])
         agent_future = transform_points(agent_future[:, 2:], pix_to_m["scale"])
-        neighb_future = transform_points(neighb_future[:, :,self.loader.coors_row],
-                                                                   pix_to_m["scale"])
-        neighb_time_sorted_hist = transform_points(neighb_time_sorted_hist[:, :,self.loader.coors_row],
-                                                                   pix_to_m["scale"])
+        neighb_future = transform_points(neighb_future[:, :, self.loader.coors_row],
+                                         pix_to_m["scale"])
+        neighb_time_sorted_hist = transform_points(neighb_time_sorted_hist[:, :, self.loader.coors_row],
+                                                   pix_to_m["scale"])
         to_localM_transform = np.eye(3)
         if self.cfg["raster_params"]["normalize"]:
             angle_deg = trajectory_orientation(agent_history[0][:2], agent_history[1][:2])
@@ -429,7 +396,7 @@ class DatasetFromTxt(torch.utils.data.Dataset):
             argsort_inexes = None
         # all agents with ped_id history
         agents_history = self.loader.get_agent_history(dataset_index, ped_id, ts, indexes, argsort_inexes)
-        seen_peds_ds = agents_history[:,0,1]
+        seen_peds_ds = agents_history[:, 0, 1]
         # all agents with ped_id future
         agents_future = self.loader.get_agent_future(dataset_index, ped_id, ts, indexes, argsort_inexes)
         # current agent (to be predicted) history
@@ -451,7 +418,7 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         agent_hist_avail = (agent_history[:, 0] != -1).astype(int)
         target_avil = (agent_future[:, 0] != -1).astype(int)
         hist_avail = (neighb_time_sorted_hist[:, :, 0] != -1).astype(int)
-        return agent_future, agent_hist_avail, agent_history, forces, hist_avail, neighb_time_sorted_future,\
+        return agent_future, agent_hist_avail, agent_history, forces, hist_avail, neighb_time_sorted_future, \
                neighb_time_sorted_hist, ped_id, target_avil, ts
 
     def calc_speed_accel(self, agent_history, neigh_localM, agent_history_av, neigh_localM_av):
@@ -476,7 +443,8 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         neigh_localM = np.concatenate((neigh_localM, neigh_speed, neigh_acc), axis=2)
         return agent_history, neigh_localM
 
-    def crop_and_normilize(self, agent_future, agent_hist_avail, agent_history, file, hist_avail, img, target_avil,
+    def crop_and_normilize(self, agent_future, agent_hist_avail, agent_history, folder_file, hist_avail, img,
+                           target_avil,
                            time_sorted_hist, forces, mask, border_width, transform, neighb_future=None,
                            neighb_future_av=None):
         output = DataStructure()
@@ -486,9 +454,25 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         #  calcultate transformation matrixes for pix to meters
         #  transform poses from pix to meters (local CS)
 
-        file = file[file.index("/") + 1:file.index(".")]
+        if "SDD" not in folder_file:
+            agent_future[:, 2:] = world2image(agent_future[:, 2:], np.linalg.inv(self.loader.homography[folder_file]))
 
-        #save file, and initial (from dataset) positions and availabilities
+            agent_history[:, 2:] = world2image(agent_history[:, 2:], np.linalg.inv(self.loader.homography[folder_file]))
+            for i in range(len(time_sorted_hist)):
+                time_sorted_hist[i][:, 2:] = world2image(time_sorted_hist[i][:, 2:],
+                                                         np.linalg.inv(self.loader.homography[folder_file]))
+            for i in range(len(neighb_future)):
+                neighb_future[i][:, 2:] = world2image(neighb_future[i][:, 2:],
+                                                      np.linalg.inv(self.loader.homography[folder_file]))
+            if "eth" in folder_file or "UCY" in folder_file:
+                agent_future[:, 2:] = np.flip(agent_future[:, 2:], axis=1)
+                agent_history[:, 2:] = np.flip(agent_history[:, 2:], axis=1)
+                time_sorted_hist[:, :, 2:] = np.flip(time_sorted_hist[:, :, 2:], axis=2)
+                neighb_future[:, :, 2:] = np.flip(neighb_future[:, :, 2:], axis=2)
+
+        file = folder_file[folder_file.index("/") + 1:folder_file.index(".")]
+
+        # save file, and initial (from dataset) positions and availabilities
         output.file = file
         output.orig_pixels_hist = np.copy(agent_history[:, self.loader.coors_row])
         output.orig_pixels_future = np.copy(agent_future[:, self.loader.coors_row])
@@ -496,39 +480,39 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         output.target_av = target_avil
         output.neighb_poses_av = hist_avail
 
-
         tl_y, tl_x, br_y, br_x = (0, 0, 0, 0)
-
-        if img is None:
-            scale = np.eye(3)
+        if ("SDD" in folder_file) or ("sdd" in folder_file):
+            pix_to_m = np.eye(3) * self.cfg['SDD_scales'][file]["scale"]
+            pix_to_m[2, 2] = 1
+            scale_factor = self.loader.resize_datastes["SDD"]
         else:
-            img, _, scale, \
-            mask, _, \
-            (tl_y, tl_x, br_y, br_x), rotation_matrix = sdd_crop_and_rotate(img, agent_history[:, 2:],
-                                                                            draw_traj=1,
-                                                                            pix_to_m_cfg=self.cfg['SDD_scales'],
-                                                                            cropping_cfg=self.cfg['cropping_cfg'],
-                                                                            file=file,
-                                                                            mask=mask,
-                                                                            scale_factor=self.loader.resize_datastes[
-                                                                                "SDD"],
-                                                                            transform=transform,
-                                                                            neighb_hist=time_sorted_hist,
-                                                                            neighb_hist_avail=hist_avail)
+            pix_to_m = self.loader.homography[folder_file]
+            scale_factor = self.loader.resize_datastes["ETH/UCY"]
 
+        img, _, scale, mask, _, (tl_y, tl_x, br_y, br_x), \
+        rotation_matrix = sdd_crop_and_rotate(img, agent_history[:, 2:],
+                                              draw_traj=1,
+                                              pix_to_meters=pix_to_m,
+                                              cropping_cfg=self.cfg['cropping_cfg'],
+                                              file=file,
+                                              mask=mask,
+                                              scale_factor=scale_factor,
+                                              transform=transform,
+                                              neighb_hist=time_sorted_hist,
+                                              neighb_hist_avail=hist_avail, agent_hist_avail=agent_hist_avail)
 
         import cv2
 
         ###
         agent_center_intermidiate = transform @ np.append(agent_history[:, 2:][0], 1)
-        scale_ = self.cfg['SDD_scales'][file]["scale"]
-        pix_to_meters = (np.eye(3) * scale_)
+        # scale_ = self.cfg['SDD_scales'][file]["scale"]
+        # pix_to_meters = (np.eye(3) * scale_)
         radius = np.sqrt(2) * (round(
             max(np.linalg.norm((transform @ np.append(agent_history[:, 2:][0], 1))[:2] - np.array([tl_x, tl_y])),
                 np.linalg.norm((transform @ np.append(agent_history[:, 2:][0], 1))[:2] - np.array([br_x, br_y])))))
 
-        img_ = img[int(agent_center_intermidiate[1] - radius): int(agent_center_intermidiate[1] + radius),
-               int(agent_center_intermidiate[0] - radius): int(agent_center_intermidiate[0] + radius)]
+        img_ = img[max(int(agent_center_intermidiate[1] - radius),0): int(agent_center_intermidiate[1] + radius),
+               max(0,int(agent_center_intermidiate[0] - radius)): int(agent_center_intermidiate[0] + radius)]
         if mask is not None:
             mask = mask[int(agent_center_intermidiate[1] - radius): int(agent_center_intermidiate[1] + radius),
                    int(agent_center_intermidiate[0] - radius): int(agent_center_intermidiate[0] + radius)]
@@ -537,17 +521,25 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         br_y_intermidiate = br_y - (agent_center_intermidiate[1] - radius)
         br_x_intermidiate = br_x - (agent_center_intermidiate[0] - radius)
 
+        # assert (tl_x_intermidiate - br_x_intermidiate) < 0
+        assert (tl_y_intermidiate - br_y_intermidiate) < 0
+        assert tl_x_intermidiate > 0
+        assert tl_y_intermidiate > 0
+
         output.cropping_points = np.array([tl_x_intermidiate, tl_y_intermidiate, br_x_intermidiate, br_y_intermidiate])
 
         # TODO: depend at pic size in meters!
         size_constant = self.cfg["cropping_cfg"]["image_area_meters"][0] * 0.08
+        datasaet_name = "SDD" if "SDD" in file else "ETH/UCY"
         img_size = (
-            int(size_constant * self.loader.img_size["SDD"][0]), int(size_constant * self.loader.img_size["SDD"][1]))
+            int(size_constant * self.loader.img_size[datasaet_name][0]),
+            int(size_constant * self.loader.img_size[datasaet_name][1]))
         new_im = np.zeros((img_size[0], img_size[1], 3), dtype=np.uint8)
         new_im[:img_.shape[0], :img_.shape[1]] = np.copy(img_)
         del img_
         img = new_im
-
+        assert img.shape[0] > br_x_intermidiate and img.shape[0] > tl_x_intermidiate
+        assert img.shape[1] > br_y_intermidiate and img.shape[1] > tl_y_intermidiate
         output.img = img
 
         co_operator = ChangeOrigin(
@@ -573,8 +565,8 @@ class DatasetFromTxt(torch.utils.data.Dataset):
 
         output.mask = mask
 
-        pix_to_m = np.eye(3) * self.cfg['SDD_scales'][file]["scale"]
-        pix_to_m[2, 2] = 1
+        # pix_to_m = np.eye(3) * self.cfg['SDD_scales'][file]["scale"]
+        # pix_to_m[2, 2] = 1
 
         output.pix_to_m = pix_to_m
 
@@ -588,6 +580,11 @@ class DatasetFromTxt(torch.utils.data.Dataset):
 
         global_agent_pix_pose_co_operator = ChangeOrigin(
             new_origin=(agent_history[:, self.loader.coors_row][0]),
+            rotation=np.eye(2))
+
+        global_center_in_local_cs = pix_to_m[:, 2] / pix_to_m[2, 2]
+        global_center_to_local_center = ChangeOrigin(
+            new_origin=global_center_in_local_cs,
             rotation=np.eye(2))
         # agent_from_glob_raster = np.linalg.inv(scale) @ pix_to_m @ new_origin_operator.transformation_matrix @ scale @ tl_co_operator.transformation_matrix @ rotation_matrix @ transform #@ np.append(agent_history[:, self.loader.coors_row][0], 1) @ np.append(agent_history[:, self.loader.coors_row][0], 1)
         agent_from_glob_raster = pix_to_m @ global_agent_pix_pose_co_operator.transformation_matrix @ np.linalg.inv(
@@ -606,24 +603,21 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         output.raster_from_world = raster_from_world
         output.raster_from_agent = np.linalg.inv(agent_from_raster)
 
-        agent_hist_localM = transform_points(agent_history[:, self.loader.coors_row],
-                                             # pix_to_m @ intermidiate_to_locraster @ transform)
-                                             # agent_from_raster   @ tl_co_operator.transformation_matrix @ rotation_matrix @ transform)
-                                             agent_from_glob_raster)
-
-        neigh_localM = transform_points(time_sorted_hist[:, :, self.loader.coors_row],
-                                        # pix_to_m @ intermidiate_to_locraster @ transform) - agent_hist_M[0
-                                        # np.linalg.inv(scale) @ agent_from_raster @ scale @ tl_co_operator.transformation_matrix @ rotation_matrix @ transform)
-                                        agent_from_glob_raster)
-
-        neighb_future_localM = transform_points(neighb_future[:, :, self.loader.coors_row], agent_from_glob_raster)
-
-
-        target_localM = transform_points(agent_future[:, self.loader.coors_row],
-                                         # pix_to_m @ intermidiate_to_locraster @ transform) - agent_hist_M[0]
-                                         # np.linalg.inv(scale) @ agent_from_raster @ scale @ tl_co_operator.transformation_matrix @ rotation_matrix @ transform)
+        agent_hist_GlobalM = transform_points(agent_history[:, self.loader.coors_row],
+                                              agent_from_glob_raster)
+        agent_hist_localM = transform_points(agent_hist_GlobalM[:, :2],
+                                             global_center_to_local_center.transformation_matrix)[:, :2]
+        neigh_GlobalM = transform_points(time_sorted_hist[:, :, self.loader.coors_row],
                                          agent_from_glob_raster)
+        neigh_localM = transform_points(neigh_GlobalM[:, :, :2], global_center_to_local_center.transformation_matrix)
 
+        neighb_future_globalM = transform_points(neighb_future[:, :, self.loader.coors_row], agent_from_glob_raster)
+        neighb_future_localM = transform_points(neighb_future_globalM[:, :, :2],
+                                                global_center_to_local_center.transformation_matrix)
+
+        target_globalM = transform_points(agent_future[:, self.loader.coors_row], agent_from_glob_raster)
+        target_localM = transform_points(target_globalM[:, :2], global_center_to_local_center.transformation_matrix)[:,
+                        :2]
         agent_hist_localM, neigh_localM = self.calc_speed_accel(agent_hist_localM, neigh_localM, agent_hist_avail,
                                                                 hist_avail)
 
@@ -631,7 +625,6 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         output.target = target_localM
         output.neighb_poses = neigh_localM
         output.neighb_target = neighb_future_localM
-
 
         # res = [img.astype(np.uint8), mask, agent_hist_localM, agent_hist_avail, target_localM, target_avil,
         #        neigh_localM,
@@ -641,6 +634,16 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         #        np.array([tl_x_intermidiate, tl_y_intermidiate, br_x_intermidiate, br_y_intermidiate]),
         #        agent_history[:, self.loader.coors_row], agent_future[:, self.loader.coors_row], pix_to_m]
         return output
+
+
+def world2image(traj_w, H_inv):
+    # Converts points from Euclidean to homogeneous space, by (x, y) → (x, y, 1)
+    traj_homog = np.hstack((traj_w, np.ones((traj_w.shape[0], 1)))).T
+    # to camera frame
+    traj_cam = np.matmul(H_inv, traj_homog)
+    # to pixel coords
+    traj_uvz = np.transpose(traj_cam / traj_cam[2])
+    return traj_uvz[:, :2].astype(int)
 
 
 class NeighboursHistory:
@@ -754,7 +757,7 @@ class UnifiedInterface:
         self.loc_im_to_glob = np.array([item[12] for item in data])
         # self.loc_im_to_glob = np.stack([np.array(data[i]["loc_im_to_glob"]) for i in range(len(data))],
         #                                axis=0)
-
+        self.files = [dat.file for dat in data]
         self.world_to_image = None  # torch.stack([torch.tensor(data[i]["world_to_image"]) for i in range(len(data))], dim=0)
         self.centroid = None
         self.extent = None
@@ -766,60 +769,101 @@ class UnifiedInterface:
         sp = "\t"
         sn = "\t\n"
         ff = "{:10.3f}"
-        output = "UnifiedInterface batch state"+sn
+        output = "UnifiedInterface batch state" + sn
         for batch in range(len(self.history_agents)):
-            output +=sn+sp+"batch: "+str(batch)+sn
-            output +=sp+"agent"+sn
-            output +=sp+"history_positions"+sp+"history_av"+sn
-                    # "image"+sp+\
-                    # "segm"+sp+\
-                    # "forces"+sp+\
-                    # "map_affine"+sp+\
-                    # "cropping_points"+sp+\
-                    # "tgt"+sp+\
-                    # "tgt_avail"+sp+\
-                    # "raster_from_agent"+sp+\
-                    # "raster_from_world"+sp+\
-                    # "agent_from_world"+sp+\
-                    # "world_from_agent"+sp+\
-                    # "loc_im_to_glob"+sp+\
-                    # "world_to_image"+sp+\
-                    # "centroid"+sp+\
-                    # "extent"+sp+\
-                    # "yaw"+sp+\
-                    # "speed"+sp+\
-                    # sn
+            output += sn + sp + "batch: " + str(batch) + sn
+            output += sp + "agent" + sn
+            output += sp + "history_positions" + sp + "history_av" + sn
+            # "image"+sp+\
+            # "segm"+sp+\
+            # "forces"+sp+\
+            # "map_affine"+sp+\
+            # "cropping_points"+sp+\
+            # "tgt"+sp+\
+            # "tgt_avail"+sp+\
+            # "raster_from_agent"+sp+\
+            # "raster_from_world"+sp+\
+            # "agent_from_world"+sp+\
+            # "world_from_agent"+sp+\
+            # "loc_im_to_glob"+sp+\
+            # "world_to_image"+sp+\
+            # "centroid"+sp+\
+            # "extent"+sp+\
+            # "yaw"+sp+\
+            # "speed"+sp+\
+            # sn
             # output += table_legend
             for step in range(len(self.history_positions[batch])):
-                output += sp+ff.format(self.history_positions[batch][step][0])+sp+\
-                    ff.format(self.history_positions[batch][step][1])+sp+\
-                    str(self.history_av[batch][step])+sn
+                output += sp + ff.format(self.history_positions[batch][step][0]) + sp + \
+                          ff.format(self.history_positions[batch][step][1]) + sp + \
+                          str(self.history_av[batch][step]) + sn
             for neigh in range(len(self.history_agents[batch])):
-                output += sp+"neigh:"+str(neigh)+sn
-                output += sp+"history_positions"+sp+"history_av"+sn
+                output += sp + "neigh:" + str(neigh) + sn
+                output += sp + "history_positions" + sp + "history_av" + sn
                 for step in range(len(self.history_agents[batch][neigh])):
-                    output += sp+ff.format(self.history_agents[batch][neigh][step][0])+sp+\
-                        ff.format(self.history_agents[batch][neigh][step][1])+sp+\
-                        str(self.history_agents_avail[batch][neigh][step])+sn
+                    output += sp + ff.format(self.history_agents[batch][neigh][step][0]) + sp + \
+                              ff.format(self.history_agents[batch][neigh][step][1]) + sp + \
+                              str(self.history_agents_avail[batch][neigh][step]) + sn
         return output
-
-
-
 
 
 def collate_wrapper(batch):
     return UnifiedInterface(batch)
 
 
+import cv2
+
 if __name__ == "__main__":
+
+    from utils import preprocess_data
+    from torch.utils.data import DataLoader
+
     path = "/media/robot/hdd1/hdd_repos/pedestrian_forecasting_dataloader/data/train/"
     cfg["one_ped_one_traj"] = False
-    files = ["biwi_eth/biwi_eth.txt",
-             # "UCY/zara02/zara02.txt",
-             # "UCY/zara03/zara03.txt",
-             # "UCY/students01/students01.txt",
-             # "UCY/students03/students03.txt",
+    cfg["raster_params"]["use_segm"] = True
+
+    # files = ["biwi_eth/biwi_eth.txt",
+    #          # "UCY/zara02/zara02.txt",
+    #          # "UCY/zara03/zara03.txt",
+    #          # "UCY/students01/students01.txt",
+    #          # "UCY/students03/students03.txt",
+    #          ]
+    # dataset = DatasetFromTxt(path, files, cfg_=cfg)
+    # dataloader = DataLoader(dataset, batch_size=1,
+    #                               shuffle=True, num_workers=0, collate_fn=collate_wrapper)  # , prefetch_factor=3)
+    # for i in range(5):
+    #     data = next(iter(dataloader))
+    #     img, segm = preprocess_data(data, cfg)
+    #     plt.imshow(img.reshape(3, img.shape[2], img.shape[3]).permute(1, 2, 0))
+    #     plt.show()
+    #     img_n = img.numpy()
+    #     transform_points(data.history_positions[0][:,:2], data.raster_from_agent[0])
+    #     # data.raster_from_agent[0] @ data.history_positions[0]
+    #     pass
+
+    files = [
+             "biwi_eth/biwi_eth.txt",
+             "eth_hotel/eth_hotel.txt",
+             "UCY/zara02/zara02.txt",
+             "UCY/zara01/zara01.txt",
+             "UCY/students01/students01.txt",
+             "UCY/students03/students03.txt",
              ]
     dataset = DatasetFromTxt(path, files, cfg_=cfg)
-    data = dataset[0]
+    dataloader = DataLoader(dataset, batch_size=1,
+                            shuffle=True, num_workers=0, collate_fn=collate_wrapper)  # , prefetch_factor=3)
+    for i in range(100):
 
+        data = next(iter(dataloader))
+        print(i, data.files)
+        img, segm = preprocess_data(data, cfg)
+        plt.imshow(np.flip((img[0].reshape(3, img.shape[2], img.shape[3]).permute(1, 2, 0)).numpy(), axis=2))
+        # plt.show()
+        plt.savefig('foo'+str(i)+'.png')
+        plt.clf()
+        assert img.max() > 0
+        img_n = img.numpy()
+        transform_points(data.history_positions[0][:, :2], data.raster_from_agent[0])
+        pass
+    exit
+    exit()

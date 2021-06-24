@@ -19,7 +19,7 @@ try:
 except:
     from .transformations import Resize, AddBorder, Rotate, Crop
 
-
+torch.nn.CrossEntropyLoss
 class DataStructure:
     def __init__(self):
         self.agent_pose = None
@@ -71,8 +71,8 @@ def preprocess_data(data, cfg, device="cpu") -> torch.tensor:
 
     mask_tensor = None
     if data.segm is not None:
-        mask_tensor = (torch.tensor(data.segm.squeeze(), device=device, dtype=torch.float32).unsqueeze(1)/255)
-        # imgs_tensor = torch.cat((imgs_tensor, mask_tensor), dim=1)
+        bs, img_x, img_y, segm_chan = data.segm.shape
+        mask_tensor = (torch.tensor(data.segm, device=device, dtype=torch.float32).permute(0, 3, 1, 2)/255)
     bs = imgs_tensor.shape[0]
     cropping_points = data.cropping_points
     bboxes = torch.zeros((bs, 4, 2), device=device)
@@ -110,7 +110,9 @@ def transform_points2d(points: np.array, transform: np.array):
     """
     path_ = np.ones([points.shape[0], points.shape[1] + 1])
     path_[:, :2] = points
-    return np.einsum("ki, ji->jk", transform, path_)[:, :2]
+    res_unscaled = np.einsum("ki, ji -> jk", transform, path_)
+    res = res_unscaled / res_unscaled[:,2:]
+    return res[:, :2] # np.einsum("ki, ji -> jk", transform, path_)[:, :2]
 
 
 def transform_points3d(points: np.array, transform: np.array):
@@ -232,40 +234,33 @@ def crop_image_crowds(img, cfg, agent_center_img: np.array, transform, rot_mat, 
     return cropped, image_resize_coef, mask_cropped
 
 
-def crop_image(img, cfg, agent_center: np.array, pix_to_met, mask_pil):
+def crop_image(img, cfg, agent_center: np.array, pix_to_met, mask_pil, file=""):
     # size = img.size
     # np_img = np.asarray(img)
 
     # position of [agent_x - 0.25area_x, agent_y - 0.5area_y] in meters
-    tl_meters = pix_to_met @ (np.append(agent_center, 1)) - np.array([cfg["agent_center"][0] * cfg["image_area_meters"][1],
-                          cfg["agent_center"][1] * cfg["image_area_meters"][0],
-                          0])
+    agent_center_meters = pix_to_met @ (np.append(agent_center, 1))
+    agent_center_meters = agent_center_meters / agent_center_meters[2]
 
+    tl_meters = agent_center_meters - np.array([cfg["agent_center"][0] * cfg["image_area_meters"][1],
+                          cfg["agent_center"][1] * cfg["image_area_meters"][0], 0])
+
+    if "students" in file:
+        tl_meters = agent_center_meters - np.array([cfg["agent_center"][1] * cfg["image_area_meters"][0],
+                                                    cfg["agent_center"][0] * cfg["image_area_meters"][1], 0])
     # position of [agent_x + 0.75area_x, agent_y + 0.5area_y]
-    br_meters = pix_to_met @ (np.append(agent_center, 1)) + np.array([(1 - cfg["agent_center"][0]) * cfg["image_area_meters"][1],
-                          (1 - cfg["agent_center"][1]) * cfg["image_area_meters"][0],
-                          0])
-
+    br_meters = agent_center_meters + np.array([(1 - cfg["agent_center"][0]) * cfg["image_area_meters"][1],
+                          (1 - cfg["agent_center"][1]) * cfg["image_area_meters"][0], 0])
+    if "students" in file:
+        br_meters = agent_center_meters + np.array([(1 - cfg["agent_center"][1]) * cfg["image_area_meters"][1],
+                          (1 - cfg["agent_center"][0]) * cfg["image_area_meters"][0], 0])
     tl_pix = np.linalg.inv(pix_to_met) @ tl_meters
+    tl_pix = tl_pix / tl_pix[2]
     br_pix = np.linalg.inv(pix_to_met) @ br_meters
-    # assert np.allclose((br_meters[:2] - tl_meters[:2]),
-    #                    np.array([cfg["image_area_meters"][0], cfg["image_area_meters"][1]]))
+    br_pix = br_pix / br_pix[2]
 
-    # tl_x = max(0, agent_center[1] - cfg["agent_center"][1] * cfg["image_area_meters"][0] / pix_to_met[0,0])
-    # tl_y = max(0, agent_center[0] - cfg["agent_center"][0] * cfg["image_area_meters"][1] / pix_to_met[0,0])
-    # br_x = max(0, agent_center[1] + (1 - cfg["agent_center"][1]) * cfg["image_area_meters"][0] / pix_to_met[0,0])
-    # br_y = max(0, agent_center[0] + (1 - cfg["agent_center"][0]) * cfg["image_area_meters"][1] / pix_to_met[0,0])
-    # assert tl_x * tl_y * br_y * br_x != 0
     image_resize_coef = [cfg["image_shape"][0] / abs(tl_pix[1] - br_pix[1]), cfg["image_shape"][1] / abs(tl_pix[0] - br_pix[0])]
 
-    # cropped = img.crop((tl_y, tl_x, br_y, br_x))
-    # mask_pil_cropped = mask_pil.crop((tl_y, tl_x, br_y, br_x))
-    # image_resize_coef = [cfg["image_shape"][0] / cropped.size[0], cfg["image_shape"][1] / cropped.size[1]]
-
-    # cropped = cropped.resize(cfg["image_shape"])
-    # mask_pil_cropped = mask_pil_cropped.resize(cfg["image_shape"], 0)
-
-    # img[int(tl_pix[1]):int(br_pix[1]), int(tl_pix[0]):int(br_pix[0])]
     return None, image_resize_coef, None, (int(tl_pix[1]), int(tl_pix[0]), int(br_pix[1]), int(br_pix[0]))
 
 
@@ -295,16 +290,16 @@ def calc_transform_matrix(init_coord, angle, scale, output_shape: List):
     return transf
 
 
-def sdd_crop_and_rotate(img: np.array, path, draw_traj=1, pix_to_m_cfg=SDD_scales,
+def sdd_crop_and_rotate(img: np.array, path, draw_traj=1, pix_to_meters=np.eye(3),
                         cropping_cfg=cropping_cfg, file=None, mask=None, scale_factor=1, transform=None, neighb_hist=None,
-                        neighb_hist_avail=None):
+                        neighb_hist_avail=None, agent_hist_avail=None):
     """
 
     :param img: image of scene, np.array, ndim == 3
     :param path: np array of observed agent history, ndim==2, [time,poses], typically [8,2]
 
     :param draw_traj:
-    :param pix_to_m_cfg:
+    :param pix_to_meters:
     :param cropping_cfg:
     :param file:
     :param mask:
@@ -323,13 +318,16 @@ def sdd_crop_and_rotate(img: np.array, path, draw_traj=1, pix_to_m_cfg=SDD_scale
 
 
 
-    draw_h(draw_traj, img, path, transform, neighb_hist[:,:,2:], neighb_hist_avail)
+    draw_h(draw_traj, img, path, transform, neighb_hist[:,:,2:], neighb_hist_avail, agent_hist_avail=agent_hist_avail)
     # img_b, mask_b = expand(border, img, mask)
     # mask_pil = ImageOps.expand(mask_pil, (border, border))
 
     angle_deg = trajectory_orientation(path[0], path[1])
-    # angle_deg = 0
-    if np.linalg.norm(path[1] - np.array([-1., -1.])) < 1e-6:
+    if "zara" in file:
+        angle_deg = 180+angle_deg
+    if "students" in file:
+        angle_deg -= 180
+    if agent_hist_avail[1] == 0:
         angle_deg = 0
     angle_rad = angle_deg / 180 * math.pi
     # agent_center = path[0] / scale_factor + scaled_border
@@ -338,24 +336,20 @@ def sdd_crop_and_rotate(img: np.array, path, draw_traj=1, pix_to_m_cfg=SDD_scale
     tm = rotate_operator.transformation_matrix
 
     # scale -> from image_pix (original) to meters
-    scale = pix_to_m_cfg[file]["scale"]
-    pix_to_meters = (np.eye(3) * scale)
-    pix_to_meters[2, 2] = 1
+
     # transform -> from image to numpy
 
-    # pix_to_meters from numpy_pix to meters =  (orig_im to meters)  @  (numpy_im to orig_image)
+    # pix to meters with border!
     pix_to_meters = pix_to_meters @ np.linalg.inv(transform)
 
     crop_img, scale, crop_mask, (tl_y, tl_x, br_y, br_x) = crop_image(img, cropping_cfg,
                                                                       agent_center=agent_center,
                                                                       pix_to_met=pix_to_meters,
-                                                                      mask_pil=mask)
+                                                                      mask_pil=mask, file=file)
 
     scale_reshaping = np.eye(3)
     scale_reshaping[:2, :2] = scale_reshaping[:2, :2] * np.array(scale)
-    # for index in range(len(scale)):
-    #     scale[index] = scale[index] / scale_factor
-    # transf = calc_transform_matrix(path[0], angle_rad, scale, cropping_cfg["image_shape"])
+
     cr_operator = Crop((tl_x, tl_y), (br_x, br_y))
     cr_tm = cr_operator.transformation_matrix
     transf = scale_reshaping @ cr_tm @ tm
@@ -374,13 +368,16 @@ def expand(border, img, mask):
     return img_b, mask_b
 
 
-def draw_h(draw_traj, img, path, transform, neighb_hist=None, neighb_hist_avail=None):
+def draw_h(draw_traj, img, path, transform, neighb_hist=None, neighb_hist_avail=None, agent_hist_avail=None):
     if draw_traj:
         R = 1
-        for pose in path:
-            if np.linalg.norm(pose - np.array([-1., -1.])) > 1e-6:
+        for i, pose in enumerate(path):
+            if agent_hist_avail[i]:
                 new_pose = transform @ np.array([pose[0], pose[1], 1])
-                cv2.circle(img, (int(new_pose[0]), int(new_pose[1])), R, (0, 0, 255), -1)
+                if i == 0:
+                    cv2.circle(img, (int(new_pose[0]), int(new_pose[1])), R, (200, 100, 255), -1)
+                else:
+                    cv2.circle(img, (int(new_pose[0]), int(new_pose[1])), R, (0, 0, 255), -1)
         if neighb_hist is not None:
             for ped_id, ped in enumerate(neighb_hist):
                 for ts, pose in enumerate(ped):

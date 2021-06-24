@@ -31,6 +31,8 @@ files_all = ["SDD/bookstore_0.txt", "SDD/bookstore_1.txt", "SDD/bookstore_2.txt"
                  ]
 path_ = "/media/robot/hdd1/hdd_repos/pedestrian_forecasting_dataloader/data/train/"
 
+cfg["one_ped_one_traj"] = False
+
 def test_img_area_local_meters():
     cfg["raster_params"]["use_map"] = True
     cfg["raster_params"]["normalize"] = True
@@ -57,9 +59,9 @@ def test_img_area_local_meters():
         third_path = data[2].copy()
 
 
-        # print (np.mean(second_path - init_path)**2)
+
         assert np.allclose(second_path, init_path, rtol=1.e-3, atol=1.e-3)
-        # print(np.mean(third_path - init_path)**2)
+
         assert np.allclose(init_path, third_path, rtol=1.e-3, atol=1.e-3)
 
 
@@ -76,23 +78,24 @@ def test_img_area_global_pix():
         ind = int(np.random.rand() * len(dataset))
         data = dataset[ind]
 
-        init_path_pix = transform_points(data[2][:, :2], data[12] @ data[8])
+        init_path_pix = transform_points(data[2][:, :2], data[12] @ data[8])[:, :2]
 
         cfg["cropping_cfg"]["image_area_meters"] = [40, 40]
         dataset = DatasetFromTxt(path_, files, cfg)
         data = dataset[ind]
 
-        second_path_pix = transform_points(data[2][:, :2], data[12] @ data[8])
+        second_path_pix = transform_points(data[2][:, :2], data[12] @ data[8])[:,:2]
 
         cfg["cropping_cfg"]["image_area_meters"] = [10, 10]
         dataset = DatasetFromTxt(path_, files, cfg)
         data = dataset[ind]
-        third_path_pix = transform_points(data[2][:, :2], data[12] @ data[8])
+        third_path_pix = transform_points(data[2][:, :2], data[12] @ data[8])[:,:2]
 
         # assert np.allclose(second_path_pix, init_path_pix, third_path_pix)
         assert np.allclose(second_path_pix, init_path_pix)
         assert np.allclose(init_path_pix, third_path_pix)
         assert np.allclose(init_path_pix[data[3] == 1], data[16][data[3] == 1])
+
 
 def test_pix_to_m():
     cfg["raster_params"]["use_map"] = True
@@ -122,9 +125,9 @@ def test_pix_to_m():
         rot_mat[:2:, 2] *= 0
         gt_meters = transform_points(data[16][:, :2], data[18])
         gt_meters -= gt_meters[0]
-        gt_meters = transform_points(gt_meters, rot_mat)
+        gt_meters = transform_points(gt_meters[:, :2], rot_mat)[:, :2]
         # print (np.mean(second_path - init_path)**2)
-        assert np.allclose(second_path[:,:2][data[3]==1], gt_meters[data[3]==1], rtol=1.e-3, atol=1.e-3)
+        assert np.allclose(second_path[:, :2][data[3] == 1], gt_meters[data[3]==1], rtol=1.e-3, atol=1.e-3)
         assert np.allclose(second_path, init_path, rtol=1.e-5, atol=1.e-5)
         # print(np.mean(third_path - init_path)**2)
         assert np.allclose(init_path, third_path, rtol=1.e-5, atol=1.e-5)
@@ -264,32 +267,14 @@ if __name__ == "__main__":
     cfg["raster_params"]["use_map"] = True
     cfg["raster_params"]["normalize"] = True
     cfg["raster_params"]["use_segm"] = True
-
-    test_pix_to_m()
+    cfg["one_ped_one_traj"] = False
 
     test_img_area_local_meters()
+
+    test_pix_to_m()
 
     test_img_area_global_pix()
 
     test_img_area_local_meters_no_mask()
 
     test_img_area_local_meters_no_norm()
-    #
-    # cfg["raster_params"]["use_map"] = True
-    # cfg["raster_params"]["normalize"] = False
-    # cfg["raster_params"]["use_segm"] = False
-    # visualize_test(cfg, "fmap")
-    #
-    # cfg["raster_params"]["use_map"] = True
-    # cfg["raster_params"]["normalize"] = False
-    # cfg["raster_params"]["use_segm"] = True
-    # visualize_test(cfg, "fmask")
-    # cfg["raster_params"]["use_map"] = True
-    # cfg["raster_params"]["normalize"] = True
-    # cfg["raster_params"]["use_segm"] = False
-    # visualize_test(cfg, "nomask")
-    #
-    # cfg["raster_params"]["use_map"] = True
-    # cfg["raster_params"]["normalize"] = True
-    # cfg["raster_params"]["use_segm"] = True
-    # visualize_test(cfg, "nm")
