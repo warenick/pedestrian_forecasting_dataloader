@@ -1,17 +1,21 @@
-try:
-    from .dataloader import DatasetFromTxt
-except ImportError:
-    from dataloader import DatasetFromTxt
 import torch
 import copy
 import torch
+
+
+# try:
+    
+# except ImportError:
+    
 
 from torch.utils.data import Subset
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader
 try:
     from config import cfg
+    from dataloader import DatasetFromTxt
 except:
+    from pedestrian_forecasting_dataloader.dataloader import DatasetFromTxt
     from pedestrian_forecasting_dataloader.config import cfg
     from pedestrian_forecasting_dataloader.dataloader import collate_wrapper
 

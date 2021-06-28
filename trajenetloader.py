@@ -340,7 +340,9 @@ class TrajnetLoader:
             img_type = ".png"
 
         img_file = self.path + txt_file[0:txt_file.index(".")] + img_type
-
+#         print(img_file)
+#         print("-----------")
+#         print(self.loaded_imgs.keys())
         if img_file not in self.loaded_imgs.keys():
             raise Exception("run time loading!")
             # img = cv2.imread(img_file).astype(np.int16)
