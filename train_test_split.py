@@ -3,12 +3,11 @@ try:
 except ImportError:
     from dataloader import DatasetFromTxt
 import torch
-
+import copy
 import torch
-from torchvision.datasets import ImageFolder
+
 from torch.utils.data import Subset
 from sklearn.model_selection import train_test_split
-from torchvision.transforms import Compose, ToTensor, Resize
 from torch.utils.data import DataLoader
 
 def train_val_dataset(dataset, val_split=0.25):
@@ -42,11 +41,14 @@ def get_train_val_dataloaders(path_, cfg, validate_with, *args):
         elif validate_with == "students":
             train_files = ["eth_hotel/eth_hotel.txt", "UCY/zara02/zara02.txt",
                            "biwi_eth/biwi_eth.txt", "UCY/zara01/zara01.txt"]
-            val_files = ["UCY/students01/students01.txt", "UCY/students01/students01.txt"]
+            val_files = ["UCY/students03/students03.txt", "UCY/students01/students01.txt"]
         else:
             raise NotImplemented
-        train_dataset = DatasetFromTxt(path_, train_files, cfg, *args)
-        val_dataset = DatasetFromTxt(path_, val_files, cfg, *args)
+        cfg_c = copy.deepcopy(cfg)
+        train_dataset = DatasetFromTxt(path_, train_files, copy.deepcopy(cfg_c), *args)
+
+        cfg_c["one_ped_one_traj"] = False
+        val_dataset = DatasetFromTxt(path_, val_files, copy.deepcopy(cfg_c), *args)
         return train_dataset, val_dataset
 
     elif validate_with == "SDD":
