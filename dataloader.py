@@ -491,7 +491,7 @@ class DatasetFromTxt(torch.utils.data.Dataset):
 
         img, _, scale, mask, _, (tl_y, tl_x, br_y, br_x), \
         rotation_matrix = sdd_crop_and_rotate(img, agent_history[:, 2:],
-                                              draw_traj=self.cfg["raster_params"][""],
+                                              draw_traj=self.cfg["raster_params"]["draw_hist"],
                                               pix_to_meters=pix_to_m,
                                               cropping_cfg=self.cfg['cropping_cfg'],
                                               file=file,
