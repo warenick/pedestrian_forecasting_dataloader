@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from PIL import Image, ImageDraw, ImageOps
 from torch.utils.data import DataLoader
-
+import copy
 try:
     from force_from_txt import Force_from_txt
     from trajenetloader import TrajnetLoader
@@ -69,7 +69,7 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         assert neighb_time_sorted_hist.shape[1:] == (8, 4)
 
         neighb_future_avail = (neighb_time_sorted_future[:, :, 0] != -1).astype(int)
-        img, mask, transform = self.loader.get_map(dataset_index, ped_id, ts)
+        img, mask, reshape_and_border_transform = self.loader.get_map(dataset_index, ped_id, ts)
 
         if not self.cfg["raster_params"]["use_map"]:
             res = self.no_map_prepocessing(agent_future, agent_hist_avail, agent_history, file, forces, hist_avail, img,
@@ -80,19 +80,27 @@ class DatasetFromTxt(torch.utils.data.Dataset):
 
         if self.cfg["raster_params"]["normalize"]:
 
-            res = self.crop_and_normilize(agent_future, agent_hist_avail, agent_history, file, hist_avail, img,
-                                          target_avil, neighb_time_sorted_hist, forces, mask,
-                                          border_width=self.loader.border_datastes["SDD"], transform=transform,
-                                          neighb_future=neighb_time_sorted_future, neighb_future_av=neighb_future_avail)
+            res = self.crop_and_normilize(agent_future.copy(), agent_hist_avail.copy(), agent_history.copy(), file,
+                                          hist_avail, img, target_avil, neighb_time_sorted_hist.copy(), forces, mask,
+                                          border_width=self.loader.border_datastes["SDD"], reshape_and_border_transform=reshape_and_border_transform.copy(),
+                                          neighb_future=neighb_time_sorted_future.copy(), neighb_future_av=neighb_future_avail)
             # print(os.getpid(), 3, time.time())
 
         else:
 
             file, res = self.ssd_unnorm_image(agent_future, agent_hist_avail, agent_history, file, forces,
                                               hist_avail, img, mask, neighb_time_sorted_future,
-                                              neighb_time_sorted_hist, target_avil, transform)
+                                              neighb_time_sorted_hist, target_avil, reshape_and_border_transform)
 
         # res.append(file)
+        if "sdd" not in res.file:
+            pseudo_res = self.no_map_prepocessing(agent_future, agent_hist_avail, agent_history, file, forces, hist_avail, img,
+                                           mask, neighb_time_sorted_hist, target_avil,
+                                           neighb_future=neighb_time_sorted_future,
+                                           neighb_future_av=neighb_future_avail)
+            res.agent_pose = pseudo_res[2]
+            res.target = pseudo_res[4]
+            res.neighb_poses = pseudo_res[6]
         return res
 
     def ssd_unnorm_image(self, agent_future, agent_hist_avail, agent_history, file, forces, hist_avail, img, mask,
@@ -314,6 +322,8 @@ class DatasetFromTxt(torch.utils.data.Dataset):
 
     def no_map_prepocessing(self, agent_future, agent_hist_avail, agent_history, file, forces, hist_avail, img, mask,
                             neighb_time_sorted_hist, target_avil, neighb_future, neighb_future_av):
+
+        # TODO transform neighb_future
         if "zara" in file:
             pix_to_m = self.cfg["zara_h"]
             agent_history[:, 2:] = transform_points(agent_history[:, 2:], np.linalg.inv(pix_to_m["scale"]))
@@ -346,6 +356,12 @@ class DatasetFromTxt(torch.utils.data.Dataset):
                 neighb_time_sorted_hist[:, :, self.loader.coors_row],
                 np.linalg.inv(pix_to_m["scale"]))
 
+        if "eth" in file or "UCY" in file:
+            agent_future[:, 2:] = np.flip(agent_future[:, 2:], axis=1)
+            agent_history[:, 2:] = np.flip(agent_history[:, 2:], axis=1)
+            neighb_time_sorted_hist[:, :, 2:] = np.flip(neighb_time_sorted_hist[:, :, 2:], axis=2)
+            neighb_future[:, :, 2:] = np.flip(neighb_future[:, :, 2:], axis=2)
+
         elif "ros" in file:
             pix_to_m = self.cfg['ros_h']
             agent_history[:, 2:] = transform_points(agent_history[:, 2:], np.linalg.inv(pix_to_m["scale"]))
@@ -353,6 +369,8 @@ class DatasetFromTxt(torch.utils.data.Dataset):
             neighb_time_sorted_hist[:, :, self.loader.coors_row] = transform_points(
                 neighb_time_sorted_hist[:, :, self.loader.coors_row],
                 np.linalg.inv(pix_to_m["scale"]))
+
+
 
         agent_history = transform_points(agent_history[:, 2:], pix_to_m["scale"])
         agent_future = transform_points(agent_future[:, 2:], pix_to_m["scale"])
@@ -431,8 +449,7 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         acc[:, 0][acc[:, 0] == 0] += 1e-6
         acc[agent_history_av == 0] *= 0
         # TODO: unprecise [1, 0, 0] -> grad: [not0, not0, 0]
-        # real_neigh_localM = 1 * neigh_localM
-        # real_neigh_localM[:, np.sum(neigh_localM_av, axis=0):] = real_neigh_localM[:, np.sum(neigh_localM_av, axis=0) - 1]
+
         neigh_speed = -np.gradient(neigh_localM, axis=1) / 0.4
         neigh_speed[:, :, 0][neigh_speed[:, :, 0] == 0] += 1e-6
         neigh_speed[neigh_localM_av == 0] *= 0
@@ -445,7 +462,7 @@ class DatasetFromTxt(torch.utils.data.Dataset):
 
     def crop_and_normilize(self, agent_future, agent_hist_avail, agent_history, folder_file, hist_avail, img,
                            target_avil,
-                           time_sorted_hist, forces, mask, border_width, transform, neighb_future=None,
+                           time_sorted_hist, forces, mask, border_width, reshape_and_border_transform, neighb_future=None,
                            neighb_future_av=None):
         output = DataStructure()
         output.neighb_target_av = neighb_future_av
@@ -489,7 +506,7 @@ class DatasetFromTxt(torch.utils.data.Dataset):
             pix_to_m = self.loader.homography[folder_file]
             scale_factor = self.loader.resize_datastes["ETH/UCY"]
 
-        img, _, scale, mask, _, (tl_y, tl_x, br_y, br_x), \
+        img, _, final_image_resize_coef, mask, _, (tl_y, tl_x, br_y, br_x), \
         rotation_matrix = sdd_crop_and_rotate(img, agent_history[:, 2:],
                                               draw_traj=self.cfg["raster_params"]["draw_hist"],
                                               pix_to_meters=pix_to_m,
@@ -497,25 +514,28 @@ class DatasetFromTxt(torch.utils.data.Dataset):
                                               file=file,
                                               mask=mask,
                                               scale_factor=scale_factor,
-                                              transform=transform,
+                                              transform=reshape_and_border_transform,
                                               neighb_hist=time_sorted_hist,
                                               neighb_hist_avail=hist_avail, agent_hist_avail=agent_hist_avail)
 
         import cv2
 
         ###
-        agent_center_intermidiate = transform @ np.append(agent_history[:, 2:][0], 1)
+        agent_center_intermidiate = reshape_and_border_transform @ np.append(agent_history[:, 2:][0], 1)
+        agent_center_intermidiate = agent_center_intermidiate / agent_center_intermidiate[2]
         # scale_ = self.cfg['SDD_scales'][file]["scale"]
         # pix_to_meters = (np.eye(3) * scale_)
         radius = np.sqrt(2) * (round(
-            max(np.linalg.norm((transform @ np.append(agent_history[:, 2:][0], 1))[:2] - np.array([tl_x, tl_y])),
-                np.linalg.norm((transform @ np.append(agent_history[:, 2:][0], 1))[:2] - np.array([br_x, br_y])))))
+            max(np.linalg.norm(agent_center_intermidiate[:2] - np.array([tl_x, tl_y])),
+                np.linalg.norm(agent_center_intermidiate[:2] - np.array([br_x, br_y])))))
 
         img_ = img[max(int(agent_center_intermidiate[1] - radius),0): int(agent_center_intermidiate[1] + radius),
-               max(0,int(agent_center_intermidiate[0] - radius)): int(agent_center_intermidiate[0] + radius)]
+               max(0, int(agent_center_intermidiate[0] - radius)): int(agent_center_intermidiate[0] + radius)]
+
         if mask is not None:
             mask = mask[int(agent_center_intermidiate[1] - radius): int(agent_center_intermidiate[1] + radius),
-                   int(agent_center_intermidiate[0] - radius): int(agent_center_intermidiate[0] + radius)]
+                        int(agent_center_intermidiate[0] - radius): int(agent_center_intermidiate[0] + radius)]
+
         tl_x_intermidiate = tl_x - (agent_center_intermidiate[0] - radius)
         tl_y_intermidiate = tl_y - (agent_center_intermidiate[1] - radius)
         br_y_intermidiate = br_y - (agent_center_intermidiate[1] - radius)
@@ -543,7 +563,7 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         output.img = img
 
         co_operator = ChangeOrigin(
-            new_origin=((agent_center_intermidiate[0] - radius, agent_center_intermidiate[1] - radius)),
+            new_origin=(agent_center_intermidiate[0] - radius, agent_center_intermidiate[1] - radius),
             rotation=np.eye(2))
 
         rotation_matrix_cropped = co_operator.transformation_matrix @ rotation_matrix @ np.linalg.inv(
@@ -556,7 +576,7 @@ class DatasetFromTxt(torch.utils.data.Dataset):
             new_origin=((tl_x, tl_y)),
             rotation=np.eye(2))
 
-        intermidiate_to_locraster = scale @ tl_co_operator.transformation_matrix @ rotation_matrix
+        intermidiate_to_locraster = final_image_resize_coef @ tl_co_operator.transformation_matrix @ rotation_matrix
 
         if mask is not None:
             new_mask = np.zeros((img_size[0], img_size[1], 1), dtype=np.uint8)
@@ -570,13 +590,13 @@ class DatasetFromTxt(torch.utils.data.Dataset):
 
         output.pix_to_m = pix_to_m
 
-        initial_resize = transform.copy()
+        initial_resize = reshape_and_border_transform.copy()
         initial_resize[:2, 2:] *= 0
         new_origin_operator = ChangeOrigin(new_origin=(intermidiate_to_locraster @ agent_center_intermidiate)[:2],
                                            rotation=np.eye(2))
         no_tm = new_origin_operator.transformation_matrix
 
-        agent_from_raster = np.linalg.inv(initial_resize) @ np.linalg.inv(scale) @ pix_to_m @ no_tm
+        agent_from_raster = np.linalg.inv(initial_resize) @ np.linalg.inv(final_image_resize_coef) @ pix_to_m @ no_tm
 
         global_agent_pix_pose_co_operator = ChangeOrigin(
             new_origin=(agent_history[:, self.loader.coors_row][0]),
@@ -588,9 +608,9 @@ class DatasetFromTxt(torch.utils.data.Dataset):
             rotation=np.eye(2))
         # agent_from_glob_raster = np.linalg.inv(scale) @ pix_to_m @ new_origin_operator.transformation_matrix @ scale @ tl_co_operator.transformation_matrix @ rotation_matrix @ transform #@ np.append(agent_history[:, self.loader.coors_row][0], 1) @ np.append(agent_history[:, self.loader.coors_row][0], 1)
         agent_from_glob_raster = pix_to_m @ global_agent_pix_pose_co_operator.transformation_matrix @ np.linalg.inv(
-            transform) @ rotation_matrix @ transform
+            reshape_and_border_transform) @ rotation_matrix @ reshape_and_border_transform
         # global_pix_from_raster = np.linalg.inv(transform) @ np.linalg.inv(globPix_to_locraster)
-        world_from_raster = pix_to_m @ np.linalg.inv(intermidiate_to_locraster @ transform)
+        world_from_raster = pix_to_m @ np.linalg.inv(intermidiate_to_locraster @ reshape_and_border_transform)
 
         output.loc_im_to_glob = np.linalg.inv(pix_to_m) @ world_from_raster
 
