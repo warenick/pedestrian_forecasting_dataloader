@@ -72,19 +72,19 @@ def get_train_val_dataloaders(path_, cfg, validate_with, *args):
             val_files = ["eth_hotel/eth_hotel.txt"]
         elif validate_with == "biwi_eth":
             train_files = ["eth_hotel/eth_hotel.txt", "UCY/students01/students01.txt", "UCY/students03/students03.txt",
-                           "UCY/zara01/zara01.txt", "UCY/zara02/zara02.txt"]
+                           "UCY/zara01/zara01.txt", "UCY/zara02/zara02.txt"] + sdd_files_all
             val_files = ["biwi_eth/biwi_eth.txt"]
         elif validate_with == "zara01":
             train_files = ["eth_hotel/eth_hotel.txt", "UCY/students01/students01.txt", "UCY/students03/students03.txt",
-                           "biwi_eth/biwi_eth.txt", "UCY/zara02/zara02.txt"]
+                           "biwi_eth/biwi_eth.txt", "UCY/zara02/zara02.txt"] + sdd_files_all
             val_files = ["UCY/zara01/zara01.txt"]
         elif validate_with == "zara02":
             train_files = ["eth_hotel/eth_hotel.txt", "UCY/students01/students01.txt", "UCY/students03/students03.txt",
-                           "biwi_eth/biwi_eth.txt", "UCY/zara01/zara01.txt"]
+                           "biwi_eth/biwi_eth.txt", "UCY/zara01/zara01.txt"] + sdd_files_all
             val_files = ["UCY/zara02/zara02.txt"]
         elif validate_with == "students":
             train_files = ["eth_hotel/eth_hotel.txt", "UCY/zara02/zara02.txt",
-                           "biwi_eth/biwi_eth.txt", "UCY/zara01/zara01.txt"]
+                           "biwi_eth/biwi_eth.txt", "UCY/zara01/zara01.txt"] + sdd_files_all
             val_files = ["UCY/students03/students03.txt", "UCY/students01/students01.txt"]
         else:
             raise NotImplemented
