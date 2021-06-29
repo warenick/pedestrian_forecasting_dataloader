@@ -83,7 +83,7 @@ def preprocess_data(data, cfg, device="cpu") -> torch.tensor:
     bboxes[:, 3, :] = torch.tensor([cropping_points[:, 0], cropping_points[:, 3]], device=device).permute(1, 0)
     transf = torch.tensor(data.map_affine, device=device)[:, :2, :].float()
     new_size = cfg["cropping_cfg"]["image_shape"]
-    dst_bboxes = torch.tensor([[[0., 0], [new_size[0], 0], [new_size[0], new_size[1]], [0, new_size[1]]]], device=device).repeat(bs, 1, 1)
+    dst_bboxes = torch.tensor([[[0., 0], [new_size[0]-1, 0], [new_size[0]-1, new_size[1]-1], [0, new_size[1]-1]]], device=device).repeat(bs, 1, 1)
     flags = {}
     flags['interpolation'] = torch.tensor([0]).to(device)
     flags['align_corners'] = torch.ones(1).bool().to(device)
