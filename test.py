@@ -33,6 +33,45 @@ path_ = "/media/robot/hdd1/hdd_repos/pedestrian_forecasting_dataloader/data/trai
 
 cfg["one_ped_one_traj"] = False
 
+
+def test_ucy_poses_with_and_without_map():
+
+    path_ = "/media/robot/hdd/pedestrian_forecasting_dataloader/data/train/"
+    file_eth = [
+                "biwi_eth/biwi_eth.txt",
+                 # "eth_hotel/eth_hotel.txt",
+                 # "UCY/zara02/zara02.txt",
+                 # "UCY/zara01/zara01.txt",
+                 # "UCY/students01/students01.txt",
+                 # "UCY/students03/students03.txt"
+                ]
+    for i in range(30):
+        cfg["raster_params"]["use_map"] = True
+        cfg["raster_params"]["normalize"] = True
+        cfg["raster_params"]["use_segm"] = True
+        file_index = np.random.randint(0, len(file_eth))
+        files = [file_eth[file_index]]
+
+        dataset = DatasetFromTxt(path_, files, cfg)
+        ind = int(np.random.rand() * len(dataset))
+        init_data = dataset[ind]
+        init_path = init_data[2].copy() * init_data.agent_pose_av.reshape(8, 1)
+        init_future = init_data[4].copy() * init_data[5].reshape(12, 1)
+
+        cfg["raster_params"]["use_map"] = False
+        cfg["raster_params"]["normalize"] = True
+        cfg["raster_params"]["use_segm"] = False
+
+        dataset = DatasetFromTxt(path_, files, cfg)
+        # ind = int(np.random.rand() * len(dataset))
+        data = dataset[ind]
+        second_path = data[2].copy() * data[3].reshape(8, 1)
+        second_future = data[4].copy() * data[5].reshape(12, 1)
+        assert np.allclose(second_future,
+                           init_future, rtol=1.e-3, atol=1.e-3)
+        assert np.allclose(second_path,
+                           init_path, rtol=1.e-3, atol=1.e-3)
+
 def test_img_area_local_meters():
     cfg["raster_params"]["use_map"] = True
     cfg["raster_params"]["normalize"] = True
@@ -268,13 +307,14 @@ if __name__ == "__main__":
     cfg["raster_params"]["normalize"] = True
     cfg["raster_params"]["use_segm"] = True
     cfg["one_ped_one_traj"] = False
+    test_ucy_poses_with_and_without_map()
 
-    test_img_area_local_meters()
-
-    test_pix_to_m()
-
-    test_img_area_global_pix()
-
-    test_img_area_local_meters_no_mask()
-
-    test_img_area_local_meters_no_norm()
+    # test_img_area_local_meters()
+    #
+    # test_pix_to_m()
+    #
+    # test_img_area_global_pix()
+    #
+    # test_img_area_local_meters_no_mask()
+    #
+    # test_img_area_local_meters_no_norm()
