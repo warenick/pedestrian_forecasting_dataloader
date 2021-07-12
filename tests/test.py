@@ -335,7 +335,7 @@ if __name__ == "__main__":
     cfg["raster_params"]["normalize"] = True
     cfg["raster_params"]["use_segm"] = True
     cfg["one_ped_one_traj"] = False
-    test_ucy_poses_with_and_without_map()
+    test_img_area_local_meters()
 
     # test_img_area_local_meters()
     #
