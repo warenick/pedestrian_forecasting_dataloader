@@ -109,6 +109,13 @@ class TrajnetLoader:
                     self.data[file] = self.data[file][np.argsort(self.data[file][:, self.ts_row])]
                     self.data[file] = self.data[file][np.argsort(self.data[file][:, self.index_row], kind='mergesort')]
 
+            #### check if we want to use only part of data:
+            if self.cfg["fraction_of_data"] < 1.:
+                assert (np.all(self.data[file][:, 0][:-1] <= self.data[file][:, 0][1:]))
+                rows_to_save = int(len(self.data[file]) * self.cfg["fraction_of_data"])
+                time_when_stop = self.data[file][rows_to_save, 0]
+                self.data[file] = self.data[file][self.data[file][:, 0] < time_when_stop]
+                # self.data[file] = self.data[file][:rows_to_save]
             ### save ped ids
             if cfg["one_ped_one_traj"]:
                 self.unique_ped_ids[file] = np.unique(self.data[file][:, 1])

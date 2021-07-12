@@ -255,8 +255,10 @@ cropping_cfg = {
     "image_area_meters": [25, 25],
     "image_shape": [224, 224],
 }
+
 cfg = {
     "data_path": "../data/train/",
+    "fraction_of_data":  0.8,
     "files": ["biwi/biwi_hotel.txt", "mot/PETS09-S2L1.txt"],
     "one_ped_one_traj": True,
     "val_with_full_hist": True,
