@@ -4,7 +4,7 @@ from PIL import Image, ImageDraw, ImageOps
 from torch.utils.data import DataLoader
 import copy
 try:
-    from force_from_txt import Force_from_txt
+
     from trajenetloader import TrajnetLoader
     from utils import crop_image_crowds
     from utils import trajectory_orientation, rotate_image, DataStructure
@@ -13,7 +13,7 @@ try:
     from transformations import ChangeOrigin, Rotate
 except ImportError:
     # relative import
-    from .force_from_txt import Force_from_txt
+
     from .trajenetloader import TrajnetLoader
     from .utils import crop_image_crowds
     from .utils import trajectory_orientation, rotate_image
@@ -39,7 +39,7 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         self.files = files
         self.use_forces = use_forces
         if use_forces:
-            self.force_from_txt = Force_from_txt(forces_file)
+            raise NotImplemented
 
     def __len__(self):
 
@@ -93,7 +93,7 @@ class DatasetFromTxt(torch.utils.data.Dataset):
                                               neighb_time_sorted_hist, target_avil, reshape_and_border_transform)
 
         # res.append(file)
-        if "sdd" not in res.file:
+        if "SDD" not in res.file:
             pseudo_res = self.no_map_prepocessing(agent_future, agent_hist_avail, agent_history, file, forces, hist_avail, img,
                                            mask, neighb_time_sorted_hist, target_avil,
                                            neighb_future=neighb_time_sorted_future,
@@ -105,6 +105,7 @@ class DatasetFromTxt(torch.utils.data.Dataset):
 
     def ssd_unnorm_image(self, agent_future, agent_hist_avail, agent_history, file, forces, hist_avail, img, mask,
                          neighb_time_sorted_future, neighb_time_sorted_hist, target_avil, transform):
+        # TODO: merge with main proccess
         dataset = file[:file.index("/")]
         file = file[file.index("/") + 1:file.index(".")]
 
@@ -138,9 +139,15 @@ class DatasetFromTxt(torch.utils.data.Dataset):
                agent_from_world,
                np.linalg.inv(raster_to_agent) @ world_from_agent, forces,
                None,
-
                None]
-        return file, res
+        output = DataStructure()
+        output.update_from_list(res)
+        output.file = dataset+"/"+file
+        # print(output.file)
+        # print(output.file)
+        # print(output.file)
+        # print(output.file)
+        return dataset+"/"+file, output
 
     def normilized_img_ucy_eth(self, agent_future, agent_hist_avail, agent_history, file, forces, hist_avail, img, mask,
                                mask_pil, neighb_time_sorted_hist, pix_to_image, pix_to_m, target_avil):
@@ -323,47 +330,64 @@ class DatasetFromTxt(torch.utils.data.Dataset):
     def no_map_prepocessing(self, agent_future, agent_hist_avail, agent_history, file, forces, hist_avail, img, mask,
                             neighb_time_sorted_hist, target_avil, neighb_future, neighb_future_av):
 
-        # TODO transform neighb_future
-        if "zara" in file:
-            pix_to_m = self.cfg["zara_h"]
-            agent_history[:, 2:] = transform_points(agent_history[:, 2:], np.linalg.inv(pix_to_m["scale"]))
-            agent_future[:, 2:] = transform_points(agent_future[:, 2:], np.linalg.inv(pix_to_m["scale"]))
-            neighb_time_sorted_hist[:, :, self.loader.coors_row] = transform_points(
-                neighb_time_sorted_hist[:, :, self.loader.coors_row], np.linalg.inv(pix_to_m["scale"]))
-        elif "students" in file:
-            pix_to_m = self.cfg["student_h"]
-            agent_history[:, 2:] = transform_points(agent_history[:, 2:], np.linalg.inv(pix_to_m["scale"]))
-            agent_future[:, 2:] = transform_points(agent_future[:, 2:], np.linalg.inv(pix_to_m["scale"]))
-            neighb_time_sorted_hist[:, :, self.loader.coors_row] = transform_points(
-                neighb_time_sorted_hist[:, :, self.loader.coors_row], np.linalg.inv(pix_to_m["scale"]))
-        elif ("stanford" in file) or ("SDD" in file):
+        if "SDD" not in file :
+            pix_to_m = {"scale": self.loader.homography[file]}
+            agent_future[:, 2:] = world2image(agent_future[:, 2:], np.linalg.inv(self.loader.homography[file]))
+
+            agent_history[:, 2:] = world2image(agent_history[:, 2:], np.linalg.inv(self.loader.homography[file]))
+            for i in range(len(neighb_time_sorted_hist)):
+                neighb_time_sorted_hist[i][:, 2:] = world2image(neighb_time_sorted_hist[i][:, 2:],
+                                                         np.linalg.inv(self.loader.homography[file]))
+            for i in range(len(neighb_future)):
+                neighb_future[i][:, 2:] = world2image(neighb_future[i][:, 2:],
+                                                      np.linalg.inv(self.loader.homography[file]))
+            if "eth" in file or "UCY" in file:
+                agent_future[:, 2:] = np.flip(agent_future[:, 2:], axis=1)
+                agent_history[:, 2:] = np.flip(agent_history[:, 2:], axis=1)
+                neighb_time_sorted_hist[:, :, 2:] = np.flip(neighb_time_sorted_hist[:, :, 2:], axis=2)
+                neighb_future[:, :, 2:] = np.flip(neighb_future[:, :, 2:], axis=2)
+
+        # # TODO transform neighb_future
+        # if "zara" in file:
+        #     pix_to_m = self.cfg["zara_h"]
+        #     agent_history[:, 2:] = transform_points(agent_history[:, 2:], np.linalg.inv(pix_to_m["scale"]))
+        #     agent_future[:, 2:] = transform_points(agent_future[:, 2:], np.linalg.inv(pix_to_m["scale"]))
+        #     neighb_time_sorted_hist[:, :, self.loader.coors_row] = transform_points(
+        #         neighb_time_sorted_hist[:, :, self.loader.coors_row], np.linalg.inv(pix_to_m["scale"]))
+        # elif "students" in file:
+        #     pix_to_m = self.cfg["student_h"]
+        #     agent_history[:, 2:] = transform_points(agent_history[:, 2:], np.linalg.inv(pix_to_m["scale"]))
+        #     agent_future[:, 2:] = transform_points(agent_future[:, 2:], np.linalg.inv(pix_to_m["scale"]))
+        #     neighb_time_sorted_hist[:, :, self.loader.coors_row] = transform_points(
+        #         neighb_time_sorted_hist[:, :, self.loader.coors_row], np.linalg.inv(pix_to_m["scale"]))
+        if ("stanford" in file) or ("SDD" in file):
             dataset = file[file.index("/") + 1:file.index(".")]
             pix_to_m = np.eye(3) * self.cfg['SDD_scales'][dataset]["scale"]
             pix_to_m[2, 2] = 1
             pix_to_m = {"scale": pix_to_m}
-        elif "biwi_eth" in file:
-            pix_to_m = self.cfg['eth_univ_h']
-            agent_history[:, 2:] = transform_points(agent_history[:, 2:], np.linalg.inv(pix_to_m["scale"]))
-            agent_future[:, 2:] = transform_points(agent_future[:, 2:], np.linalg.inv(pix_to_m["scale"]))
-            neighb_time_sorted_hist[:, :, self.loader.coors_row] = transform_points(
-                neighb_time_sorted_hist[:, :, self.loader.coors_row],
-                np.linalg.inv(pix_to_m["scale"]))
-        elif "eth_hotel" in file:
-            pix_to_m = self.cfg['eth_hotel_h']
-            agent_history[:, 2:] = transform_points(agent_history[:, 2:], np.linalg.inv(pix_to_m["scale"]))
-            agent_future[:, 2:] = transform_points(agent_future[:, 2:], np.linalg.inv(pix_to_m["scale"]))
-            neighb_time_sorted_hist[:, :, self.loader.coors_row] = transform_points(
-                neighb_time_sorted_hist[:, :, self.loader.coors_row],
-                np.linalg.inv(pix_to_m["scale"]))
-
-        if "eth" in file or "UCY" in file:
-            agent_future[:, 2:] = np.flip(agent_future[:, 2:], axis=1)
-            agent_history[:, 2:] = np.flip(agent_history[:, 2:], axis=1)
-            neighb_time_sorted_hist[:, :, 2:] = np.flip(neighb_time_sorted_hist[:, :, 2:], axis=2)
-            neighb_future[:, :, 2:] = np.flip(neighb_future[:, :, 2:], axis=2)
+        # elif "biwi_eth" in file:
+        #     pix_to_m = self.cfg['eth_univ_h']
+        #     agent_history[:, 2:] = transform_points(agent_history[:, 2:], np.linalg.inv(pix_to_m["scale"]))
+        #     agent_future[:, 2:] = transform_points(agent_future[:, 2:], np.linalg.inv(pix_to_m["scale"]))
+        #     neighb_time_sorted_hist[:, :, self.loader.coors_row] = transform_points(
+        #         neighb_time_sorted_hist[:, :, self.loader.coors_row],
+        #         np.linalg.inv(pix_to_m["scale"]))
+        # elif "eth_hotel" in file:
+        #     pix_to_m = self.cfg['eth_hotel_h']
+        #     agent_history[:, 2:] = transform_points(agent_history[:, 2:], np.linalg.inv(pix_to_m["scale"]))
+        #     agent_future[:, 2:] = transform_points(agent_future[:, 2:], np.linalg.inv(pix_to_m["scale"]))
+        #     neighb_time_sorted_hist[:, :, self.loader.coors_row] = transform_points(
+        #         neighb_time_sorted_hist[:, :, self.loader.coors_row],
+        #         np.linalg.inv(pix_to_m["scale"]))
+        #
+        # if "eth" in file or "UCY" in file:
+        #     agent_future[:, 2:] = np.flip(agent_future[:, 2:], axis=1)
+        #     agent_history[:, 2:] = np.flip(agent_history[:, 2:], axis=1)
+        #     neighb_time_sorted_hist[:, :, 2:] = np.flip(neighb_time_sorted_hist[:, :, 2:], axis=2)
+        #     neighb_future[:, :, 2:] = np.flip(neighb_future[:, :, 2:], axis=2)
 
         elif "ros" in file:
-            pix_to_m = self.cfg['ros_h']
+            pix_to_m = {"scale":self.loader.homography[file]} #self.cfg['ros_h']
             agent_history[:, 2:] = transform_points(agent_history[:, 2:], np.linalg.inv(pix_to_m["scale"]))
             agent_future[:, 2:] = transform_points(agent_future[:, 2:], np.linalg.inv(pix_to_m["scale"]))
             neighb_time_sorted_hist[:, :, self.loader.coors_row] = transform_points(
@@ -831,10 +855,10 @@ def collate_wrapper(batch):
     return UnifiedInterface(batch)
 
 
-import cv2
+
 
 if __name__ == "__main__":
-
+    import cv2
     from utils import preprocess_data
     from torch.utils.data import DataLoader
 
@@ -842,24 +866,6 @@ if __name__ == "__main__":
     cfg["one_ped_one_traj"] = False
     cfg["raster_params"]["use_segm"] = True
 
-    # files = ["biwi_eth/biwi_eth.txt",
-    #          # "UCY/zara02/zara02.txt",
-    #          # "UCY/zara03/zara03.txt",
-    #          # "UCY/students01/students01.txt",
-    #          # "UCY/students03/students03.txt",
-    #          ]
-    # dataset = DatasetFromTxt(path, files, cfg_=cfg)
-    # dataloader = DataLoader(dataset, batch_size=1,
-    #                               shuffle=True, num_workers=0, collate_fn=collate_wrapper)  # , prefetch_factor=3)
-    # for i in range(5):
-    #     data = next(iter(dataloader))
-    #     img, segm = preprocess_data(data, cfg)
-    #     plt.imshow(img.reshape(3, img.shape[2], img.shape[3]).permute(1, 2, 0))
-    #     plt.show()
-    #     img_n = img.numpy()
-    #     transform_points(data.history_positions[0][:,:2], data.raster_from_agent[0])
-    #     # data.raster_from_agent[0] @ data.history_positions[0]
-    #     pass
 
     files = [
              "biwi_eth/biwi_eth.txt",
