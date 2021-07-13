@@ -258,7 +258,7 @@ cropping_cfg = {
 
 cfg = {
     "data_path": "../data/train/",
-    "fraction_of_data":  0.8,
+    "fraction_of_data":  1,
     "files": ["biwi/biwi_hotel.txt", "mot/PETS09-S2L1.txt"],
     "one_ped_one_traj": True,
     "val_with_full_hist": True,

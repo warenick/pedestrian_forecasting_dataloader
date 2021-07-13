@@ -71,36 +71,44 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         neighb_future_avail = (neighb_time_sorted_future[:, :, 0] != -1).astype(int)
         img, mask, reshape_and_border_transform = self.loader.get_map(dataset_index, ped_id, ts)
 
+        # NO MAP
         if not self.cfg["raster_params"]["use_map"]:
             res = self.no_map_prepocessing(agent_future, agent_hist_avail, agent_history, file, forces, hist_avail, img,
                                            mask, neighb_time_sorted_hist, target_avil,
                                            neighb_future=neighb_time_sorted_future,
                                            neighb_future_av=neighb_future_avail)
             return res
-
+        #MAP NORMALIZE
         if self.cfg["raster_params"]["normalize"]:
 
             res = self.crop_and_normilize(agent_future.copy(), agent_hist_avail.copy(), agent_history.copy(), file,
                                           hist_avail, img, target_avil, neighb_time_sorted_hist.copy(), forces, mask,
                                           border_width=self.loader.border_datastes["SDD"], reshape_and_border_transform=reshape_and_border_transform.copy(),
                                           neighb_future=neighb_time_sorted_future.copy(), neighb_future_av=neighb_future_avail)
-            # print(os.getpid(), 3, time.time())
+            if "SDD" in file:
+                return res
 
         else:
-
-            file, res = self.ssd_unnorm_image(agent_future, agent_hist_avail, agent_history, file, forces,
-                                              hist_avail, img, mask, neighb_time_sorted_future,
-                                              neighb_time_sorted_hist, target_avil, reshape_and_border_transform)
+            # MAP not NORMALIZE
+            if "SDD" in file:
+                file, res = self.ssd_unnorm_image(agent_future, agent_hist_avail, agent_history, file, forces,
+                                                  hist_avail, img, mask, neighb_time_sorted_future,
+                                                  neighb_time_sorted_hist, target_avil, reshape_and_border_transform)
 
         # res.append(file)
-        if "SDD" not in res.file:
+        if "SDD" not in file:
             pseudo_res = self.no_map_prepocessing(agent_future, agent_hist_avail, agent_history, file, forces, hist_avail, img,
                                            mask, neighb_time_sorted_hist, target_avil,
                                            neighb_future=neighb_time_sorted_future,
                                            neighb_future_av=neighb_future_avail)
-            res.agent_pose = pseudo_res[2]
-            res.target = pseudo_res[4]
-            res.neighb_poses = pseudo_res[6]
+            if "res" in locals():
+                #TODO
+                res.agent_pose = pseudo_res[2]
+                res.target = pseudo_res[4]
+                res.neighb_poses = pseudo_res[6]
+            else:
+                res = DataStructure().update_from_list(pseudo_res)
+
         return res
 
     def ssd_unnorm_image(self, agent_future, agent_hist_avail, agent_history, file, forces, hist_avail, img, mask,
@@ -330,7 +338,9 @@ class DatasetFromTxt(torch.utils.data.Dataset):
     def no_map_prepocessing(self, agent_future, agent_hist_avail, agent_history, file, forces, hist_avail, img, mask,
                             neighb_time_sorted_hist, target_avil, neighb_future, neighb_future_av):
 
-        if "SDD" not in file :
+        orig_hist = np.copy(agent_history[:, self.loader.coors_row])
+        orig_future = np.copy(agent_future[:, self.loader.coors_row])
+        if "SDD" not in file:
             pix_to_m = {"scale": self.loader.homography[file]}
             agent_future[:, 2:] = world2image(agent_future[:, 2:], np.linalg.inv(self.loader.homography[file]))
 

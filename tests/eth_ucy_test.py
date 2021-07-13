@@ -17,45 +17,28 @@ import numpy as np
 torch.manual_seed(46)
 np.random.seed(46)
 
-files_all = ["SDD/bookstore_0.txt", "SDD/bookstore_1.txt", "SDD/bookstore_2.txt", "SDD/bookstore_3.txt",
-             "SDD/bookstore_4.txt", "SDD/bookstore_5.txt", "SDD/bookstore_6.txt",
-             "SDD/coupa_0.txt", "SDD/coupa_2.txt", "SDD/coupa_3.txt",
-             "SDD/deathCircle_0.txt", "SDD/deathCircle_1.txt", "SDD/deathCircle_2.txt", "SDD/deathCircle_3.txt",
-             "SDD/deathCircle_4.txt",
-             "SDD/gates_0.txt", "SDD/gates_1.txt", "SDD/gates_2.txt", "SDD/gates_3.txt", "SDD/gates_4.txt",
-             "SDD/gates_5.txt", "SDD/gates_7.txt", "SDD/gates_8.txt",
-             "SDD/hyang_0.txt", "SDD/hyang_1.txt", "SDD/hyang_2.txt", "SDD/hyang_3.txt", "SDD/hyang_4.txt",
-             "SDD/hyang_5.txt", "SDD/hyang_6.txt", "SDD/hyang_7.txt", "SDD/hyang_8.txt", "SDD/hyang_9.txt",
-             "SDD/hyang_10.txt", "SDD/hyang_11.txt",
-             "SDD/hyang_12.txt", "SDD/hyang_13.txt", "SDD/hyang_14.txt",
-             "SDD/little_0.txt", "SDD/little_2.txt", "SDD/little_3.txt",
-             "SDD/nexus_0.txt", "SDD/nexus_2.txt", "SDD/nexus_3.txt", "SDD/nexus_4.txt",
-             "SDD/nexus_5.txt", "SDD/nexus_6.txt", "SDD/nexus_7.txt", "SDD/nexus_8.txt", "SDD/nexus_9.txt",
-             "SDD/nexus_10.txt", "SDD/nexus_11.txt",
-             ]
+files_all = ["biwi_eth/biwi_eth.txt",
+             "eth_hotel/eth_hotel.txt",
+             "UCY/zara02/zara02.txt",
+             "UCY/zara01/zara01.txt",
+             "UCY/students01/students01.txt",
+             "UCY/students03/students03.txt"
+            ]
+
 path_ = "/media/robot/hdd1/hdd_repos/pedestrian_forecasting_dataloader/data/train/"
 
 cfg["one_ped_one_traj"] = False
-
 
 def test_ucy_poses_with_and_without_map():
     #  TEST that (future and observed) poses of ETH\UCY is the same with and without map  """
 
     path_ = "/media/robot/hdd1/hdd_repos/pedestrian_forecasting_dataloader/data/train/"
-    file_eth = [
-        "biwi_eth/biwi_eth.txt",
-        "eth_hotel/eth_hotel.txt",
-        "UCY/zara02/zara02.txt",
-        "UCY/zara01/zara01.txt",
-        "UCY/students01/students01.txt",
-        "UCY/students03/students03.txt"
-    ]
     for i in range(30):
         cfg["raster_params"]["use_map"] = True
         cfg["raster_params"]["normalize"] = True
         cfg["raster_params"]["use_segm"] = True
-        file_index = np.random.randint(0, len(file_eth))
-        files = [file_eth[file_index]]
+        file_index = np.random.randint(0, len(files_all))
+        files = [files_all[file_index]]
 
         dataset = DatasetFromTxt(path_, files, cfg)
         ind = int(np.random.rand() * len(dataset))
@@ -187,7 +170,7 @@ def test_pix_to_m():
         gt_meters -= gt_meters[0]
         gt_meters = transform_points(gt_meters[:, :2], rot_mat)[:, :2]
         # print (np.mean(second_path - init_path)**2)
-        assert np.allclose(second_path[:, :2][data[3] == 1], gt_meters[data[3] == 1], rtol=1.e-3, atol=1.e-3)
+        assert np.allclose(second_path[:, :2][data[3] == 1], q[data[3] == 1], rtol=1.e-3, atol=1.e-3)
         assert np.allclose(second_path, init_path, rtol=1.e-5, atol=1.e-5)
         # print(np.mean(third_path - init_path)**2)
         assert np.allclose(init_path, third_path, rtol=1.e-5, atol=1.e-5)
@@ -335,7 +318,9 @@ if __name__ == "__main__":
     cfg["raster_params"]["normalize"] = True
     cfg["raster_params"]["use_segm"] = True
     cfg["one_ped_one_traj"] = False
-    test_img_area_local_meters()
+    test_pix_to_m()
+    # test_img_area_local_meters_no_norm()
+    # test_img_area_local_meters()
 
     # test_img_area_local_meters()
     #
