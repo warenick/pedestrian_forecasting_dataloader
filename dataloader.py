@@ -434,6 +434,7 @@ class DatasetFromTxt(torch.utils.data.Dataset):
         res = [img, mask, agent_history, agent_hist_avail, agent_future, target_avil,
                neigh_localM, hist_avail, raster_from_agent, np.eye(3), np.eye(3), np.eye(3),
                np.eye(3), forces, None, None, None, None, pix_to_m["scale"], file, neighb_future, neighb_future_av]
+        res = DataStructure().update_from_list(res)
         return res
 
     def get_all_poses_and_masks(self, dataset_index, file, index):
