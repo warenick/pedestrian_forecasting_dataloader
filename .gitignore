@@ -2,8 +2,8 @@ data*/
 logs/
 scripts/images/
 *.profile
-
-__pycache__/
+*.vscode/
+*__pycache__/
 *.py[cod]
 *$py.class
 
