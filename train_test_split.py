@@ -49,7 +49,7 @@ def get_dataloaders(bs=96, num_w=8,
     if "SDD" in validate_with and cfg_["fraction_of_data"] != 1:
         cfg_val = copy.deepcopy(cfg_)
         cfg_val["fraction_of_data"] = 1
-        _, val_ds = get_train_val_dataloaders(path_, cfg_, validate_with, False)
+        _, val_ds = get_train_val_dataloaders(path_, cfg_val, validate_with, False)
 
     train_dataloader = DataLoader(train_ds, batch_size=bs,
                                   shuffle=True, num_workers=num_w, collate_fn=collate_wrapper)  # , prefetch_factor=3)
