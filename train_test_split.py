@@ -46,6 +46,11 @@ def get_dataloaders(bs=96, num_w=8,
     torch.manual_seed(0)
     print("creating dataloader for validating with ", validate_with)
     train_ds, val_ds = get_train_val_dataloaders(path_, cfg_, validate_with, False)
+    if "SDD" in validate_with and cfg_["fraction_of_data"] != 1:
+        cfg_val = copy.deepcopy(cfg_)
+        cfg_val["fraction_of_data"] = 1
+        _, val_ds = get_train_val_dataloaders(path_, cfg_, validate_with, False)
+
     train_dataloader = DataLoader(train_ds, batch_size=bs,
                                   shuffle=True, num_workers=num_w, collate_fn=collate_wrapper)  # , prefetch_factor=3)
     val_dataloader = DataLoader(val_ds, batch_size=bs,
