@@ -42,10 +42,15 @@ sdd_files_all = ["SDD/bookstore_0.txt", "SDD/bookstore_1.txt", "SDD/bookstore_2.
 
 def get_dataloaders(bs=96, num_w=8,
                     path_="/media/robot/hdd1/hdd_repos/pedestrian_forecasting_dataloader/data/train/",
-                    validate_with="SDD"):
+                    validate_with="SDD", cfg_=None):
     torch.manual_seed(0)
     print("creating dataloader for validating with ", validate_with)
-    train_ds, val_ds = get_train_val_dataloaders(path_, cfg, validate_with, False)
+    train_ds, val_ds = get_train_val_dataloaders(path_, cfg_, validate_with, False)
+    if "SDD" in validate_with and cfg_["fraction_of_data"] != 1:
+        cfg_val = copy.deepcopy(cfg_)
+        cfg_val["fraction_of_data"] = 1
+        _, val_ds = get_train_val_dataloaders(path_, cfg_val, validate_with, False)
+
     train_dataloader = DataLoader(train_ds, batch_size=bs,
                                   shuffle=True, num_workers=num_w, collate_fn=collate_wrapper)  # , prefetch_factor=3)
     val_dataloader = DataLoader(val_ds, batch_size=bs,
@@ -68,23 +73,23 @@ def get_train_val_dataloaders(path_, cfg, validate_with, *args):
     if ("SDD" not in validate_with):
         if validate_with == "eth_hotel":
             train_files = ["biwi_eth/biwi_eth.txt", "UCY/students01/students01.txt", "UCY/students03/students03.txt",
-                           "UCY/zara01/zara01.txt", "UCY/zara02/zara02.txt"] + sdd_files_all
+                           "UCY/zara01/zara01.txt", "UCY/zara02/zara02.txt"] #+ sdd_files_all
             val_files = ["eth_hotel/eth_hotel.txt"]
         elif validate_with == "biwi_eth":
             train_files = ["eth_hotel/eth_hotel.txt", "UCY/students01/students01.txt", "UCY/students03/students03.txt",
-                           "UCY/zara01/zara01.txt", "UCY/zara02/zara02.txt"] + sdd_files_all
+                           "UCY/zara01/zara01.txt", "UCY/zara02/zara02.txt"] #+ sdd_files_all
             val_files = ["biwi_eth/biwi_eth.txt"]
         elif validate_with == "zara01":
             train_files = ["eth_hotel/eth_hotel.txt", "UCY/students01/students01.txt", "UCY/students03/students03.txt",
-                           "biwi_eth/biwi_eth.txt", "UCY/zara02/zara02.txt"] + sdd_files_all
+                           "biwi_eth/biwi_eth.txt", "UCY/zara02/zara02.txt"] #+ sdd_files_all
             val_files = ["UCY/zara01/zara01.txt"]
         elif validate_with == "zara02":
             train_files = ["eth_hotel/eth_hotel.txt", "UCY/students01/students01.txt", "UCY/students03/students03.txt",
-                           "biwi_eth/biwi_eth.txt", "UCY/zara01/zara01.txt"] + sdd_files_all
+                           "biwi_eth/biwi_eth.txt", "UCY/zara01/zara01.txt"] #+ sdd_files_all
             val_files = ["UCY/zara02/zara02.txt"]
         elif validate_with == "students":
             train_files = ["eth_hotel/eth_hotel.txt", "UCY/zara02/zara02.txt",
-                           "biwi_eth/biwi_eth.txt", "UCY/zara01/zara01.txt"] + sdd_files_all
+                           "biwi_eth/biwi_eth.txt", "UCY/zara01/zara01.txt"] #+ sdd_files_all
             val_files = ["UCY/students03/students03.txt", "UCY/students01/students01.txt"]
         else:
             raise NotImplemented

@@ -250,89 +250,6 @@ SDD_scales = {
 }
 
 
-students_pix_to_image_cfg = {
-    "displ_y": (576)//2,
-    "displ_x": (720)//2,
-    "coef_x": 1,
-    "coef_y": -1
-}
-
-# eth_univ_pix_to_image_cfg = {
-#     "displ_y": -(400)//2,
-#     "displ_x": -(480)//2,
-#     "coef_x": 1,
-#     "coef_y": 1
-# }
-# eth_univ_pix_to_image_cfg = {
-#     "displ_y": (1520)//2,
-#     "displ_x": -(320)//2,
-#     "coef_x": 1,
-#     "coef_y": -1
-# }
-
-# 640 480
-# eth_univ_pix_to_image_cfg = {
-#     "displ_y": -(640)//2,
-#     "displ_x": -(320)//2,
-#     "coef_x": 1,
-#     "coef_y": 1
-# }
-
-eth_univ_pix_to_image_cfg = {
-    "displ_y": -(160)//2,
-    "displ_x": (-50)//2,
-    "coef_x": 1,
-    "coef_y": 1
-}
-
-
-eth_hotel_pix_to_image_cfg = {
-    "displ_y": 650//2,
-    "displ_x": (950)//2,
-    "coef_x": 1,
-    "coef_y": 1
-}
-
-zara1_pix_to_image_cfg = {
-    "displ_y": (1420+22)//2,
-    "displ_x": (-20)//2,
-    "coef_x": 1,
-    "coef_y": -1
-}
-
-zara3_pix_to_image_cfg = {
-    "displ_y": (680)//2,
-    "displ_x": (620)//2,
-    "coef_x": -1,
-    "coef_y": -1
-}
-zara2_pix_to_image_cfg = {
-    "displ_y": 0//2,
-    "displ_x": (-20)//2,
-    "coef_x": 1,
-    "coef_y": -1
-}
-zara_cfg = {"scale": np.array([[-2.595651699999999840e-02, -5.157280400000000145e-18, 7.838868099999996453e+00],
-                                [-1.095387399999999886e-03, 2.166433000000000247e-02, 5.566045600000004256e+00],
-                                [1.954012500000000506e-20, 4.217141000000002596e-19, 1.000000000000000444e+00]])
-            }  # pix to meters,   x axis inverted? starting from [?, ?]
-
-ros_cfg = {"scale": np.eye(3)
-            }  # pix to meters,   x axis inverted? starting from [?, ?]
-
-student_cfg = {"scale": np.array([[0.02104651,  0.,         7.57676355],
-                                  [0.,         0.02386598, 6.87340224],
-                                  [0.,         0.,         1.]])
-               }  # pix to meters! pixels from [-359, -288] to [359, 288] !!!
-
-eth_univ_cfg = {"scale": np.array([[2.8128700e-02,   2.0091900e-03,  -4.6693600e+00],
-                                   [8.0625700e-04,   2.5195500e-02,  -5.0608800e+00],
-                                   [0,   0,   1]])} # /4.6255300e-01
-
-eth_hotel_cfg = {"scale": np.array([[1.1048200e-02,   6.6958900e-04,  -3.3295300e+00],
-                                   [-1.5966000e-03,   1.1632400e-02,  -5.3951400e+00],
-                                   [1.1190700e-24,   1.3617400e-25,   1]])} # /5.4276600e-01
-
 cropping_cfg = {
     "agent_center": [0.25, 0.5],
     "image_area_meters": [25, 25],
@@ -341,6 +258,7 @@ cropping_cfg = {
 
 cfg = {
     "data_path": "../data/train/",
+    "fraction_of_data":  1,
     "files": ["biwi/biwi_hotel.txt", "mot/PETS09-S2L1.txt"],
     "one_ped_one_traj": True,
     "val_with_full_hist": True,
@@ -374,16 +292,80 @@ cfg = {
     },
 
     "SDD_scales": SDD_scales,
-    "ros_h": ros_cfg,
-    "zara_h": zara_cfg,
-    "student_h": student_cfg,
-    "eth_univ_h": eth_univ_cfg,
-    "eth_hotel_h": eth_hotel_cfg,
     "cropping_cfg": cropping_cfg,
-    "students_pix_to_image_cfg": students_pix_to_image_cfg,
-    "eth_univ_pix_to_image_cfg": eth_univ_pix_to_image_cfg,
-    "zara2_pix_to_image_cfg": zara2_pix_to_image_cfg,
-    "zara3_pix_to_image_cfg": zara3_pix_to_image_cfg,
-    "zara1_pix_to_image_cfg": zara1_pix_to_image_cfg,
-    "eth_hotel_pix_to_image_cfg": eth_hotel_pix_to_image_cfg,
+    # "ros_h": ros_cfg,
+    # "zara_h": zara_cfg,
+    # "student_h": student_cfg,
+    # "eth_univ_h": eth_univ_cfg,
+    # "eth_hotel_h": eth_hotel_cfg,
+    #
+    # "students_pix_to_image_cfg": students_pix_to_image_cfg,
+    # "eth_univ_pix_to_image_cfg": eth_univ_pix_to_image_cfg,
+    # "zara2_pix_to_image_cfg": zara2_pix_to_image_cfg,
+    # "zara3_pix_to_image_cfg": zara3_pix_to_image_cfg,
+    # "zara1_pix_to_image_cfg": zara1_pix_to_image_cfg,
+    # "eth_hotel_pix_to_image_cfg": eth_hotel_pix_to_image_cfg,
 }
+
+
+# students_pix_to_image_cfg = {
+#     "displ_y": (576)//2,
+#     "displ_x": (720)//2,
+#     "coef_x": 1,
+#     "coef_y": -1
+# }
+#
+# eth_univ_pix_to_image_cfg = {
+#     "displ_y": -(160)//2,
+#     "displ_x": (-50)//2,
+#     "coef_x": 1,
+#     "coef_y": 1
+# }
+#
+#
+# eth_hotel_pix_to_image_cfg = {
+#     "displ_y": 650//2,
+#     "displ_x": (950)//2,
+#     "coef_x": 1,
+#     "coef_y": 1
+# }
+#
+# zara1_pix_to_image_cfg = {
+#     "displ_y": (1420+22)//2,
+#     "displ_x": (-20)//2,
+#     "coef_x": 1,
+#     "coef_y": -1
+# }
+#
+# zara3_pix_to_image_cfg = {
+#     "displ_y": (680)//2,
+#     "displ_x": (620)//2,
+#     "coef_x": -1,
+#     "coef_y": -1
+# }
+# zara2_pix_to_image_cfg = {
+#     "displ_y": 0//2,
+#     "displ_x": (-20)//2,
+#     "coef_x": 1,
+#     "coef_y": -1
+# }
+# zara_cfg = {"scale": np.array([[-2.595651699999999840e-02, -5.157280400000000145e-18, 7.838868099999996453e+00],
+#                                 [-1.095387399999999886e-03, 2.166433000000000247e-02, 5.566045600000004256e+00],
+#                                 [1.954012500000000506e-20, 4.217141000000002596e-19, 1.000000000000000444e+00]])
+#             }  # pix to meters,   x axis inverted? starting from [?, ?]
+#
+# ros_cfg = {"scale": np.eye(3)
+#             }  # pix to meters,   x axis inverted? starting from [?, ?]
+#
+# student_cfg = {"scale": np.array([[0.02104651,  0.,         7.57676355],
+#                                   [0.,         0.02386598, 6.87340224],
+#                                   [0.,         0.,         1.]])
+#                }  # pix to meters! pixels from [-359, -288] to [359, 288] !!!
+#
+# eth_univ_cfg = {"scale": np.array([[2.8128700e-02,   2.0091900e-03,  -4.6693600e+00],
+#                                    [8.0625700e-04,   2.5195500e-02,  -5.0608800e+00],
+#                                    [0,   0,   1]])} # /4.6255300e-01
+#
+# eth_hotel_cfg = {"scale": np.array([[1.1048200e-02,   6.6958900e-04,  -3.3295300e+00],
+#                                    [-1.5966000e-03,   1.1632400e-02,  -5.3951400e+00],
+#                                    [1.1190700e-24,   1.3617400e-25,   1]])} # /5.4276600e-01

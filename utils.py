@@ -19,7 +19,8 @@ try:
 except:
     from .transformations import Resize, AddBorder, Rotate, Crop
 
-torch.nn.CrossEntropyLoss
+from typing import List
+
 class DataStructure:
     def __init__(self):
         self.agent_pose = None
@@ -34,7 +35,7 @@ class DataStructure:
 
         self.img = None
         self.mask = None
-        self.file = None
+        self.file = ""
 
         self.map_affine = None
         self.cropping_points = None
@@ -56,15 +57,45 @@ class DataStructure:
         self.orig_pixels_future = None
 
     def __getitem__(self, ind):
+                # 0         1           2                   3                 4        5
         res = [self.img, self.mask, self.agent_pose, self.agent_pose_av, self.target, self.target_av,
+               #    6                   7                       8                           9
                self.neighb_poses, self.neighb_poses_av, self.raster_from_agent, self.raster_from_world,
-               self.world_from_agent, self.agent_from_world,
-               self.loc_im_to_glob, self.forces, self.rot_mat,
+               #      10                    11                      12                  13          14
+               self.world_from_agent, self.agent_from_world, self.loc_im_to_glob, self.forces, self.rot_mat,
+               #        15                  16                      17                      18          19
                self.cropping_points, self.orig_pixels_hist, self.orig_pixels_future, self.pix_to_m, self.file,
+                #       20                  21
                self.neighb_target, self.neighb_target_av]
         return res[ind]
 
-
+    def update_from_list(self, data:List) -> "DataStructure":
+        try:
+            self.img = data[0]
+            self.mask = data[1]
+            self.agent_pose = data[2]
+            self.agent_pose_av = data[3]
+            self.target = data[4]
+            self.target_av = data[5]
+            self.neighb_poses = data[6]
+            self.neighb_poses_av = data[7]
+            self.raster_from_agent = data[8]
+            self.raster_from_world = data[9]
+            self.world_from_agent = data[10]
+            self.agent_from_world = data[11]
+            self.loc_im_to_glob = data[12]
+            self.forces = data[13]
+            self.rot_mat = data[14]
+            self.cropping_points = data[15]
+            self.orig_pixels_hist = data[16]
+            self.orig_pixels_future = data[17]
+            self.pix_to_m = data[18]
+            self.file = data[19]
+            self.neighb_target = data[20]
+            self.neighb_target_av = data[21]
+        except IndexError:
+            pass
+        return self
 
 def preprocess_data(data, cfg, device="cpu") -> torch.tensor:
     imgs_tensor = (torch.tensor(data.image, device=device, dtype=torch.float32).permute(0, 3, 1, 2))/255

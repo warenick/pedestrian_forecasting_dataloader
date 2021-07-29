@@ -3,7 +3,7 @@ from tqdm import tqdm
 import cv2
 import matplotlib.pyplot as plt
 import re
-
+from os.path import normpath
 try:
     from transformations import Resize, AddBorder
 except:
@@ -72,7 +72,7 @@ class TrajnetLoader:
             if "SDD" in file:
                 dataset = "SDD"
                 try:
-                    new_name = name[:name.index(".")] + ".npy"
+                    new_name = name[:name.rindex(".")] + ".npy"
                     self.data[file] = np.load(new_name).astype(np.float32)
                 except:
                     self.data[file] = np.loadtxt(path + "/" + file, delimiter=' ',
@@ -92,6 +92,7 @@ class TrajnetLoader:
                 self.data[file] = self.data[file][:, :4]
 
             ## IF NOT SDD
+
             if "SDD" not in file:
                 self.data[file] = np.genfromtxt(path + "/" + file, delimiter='').astype(np.float64)
                 self.argsort_inexes[file] = None
@@ -109,6 +110,16 @@ class TrajnetLoader:
                     self.data[file] = self.data[file][np.argsort(self.data[file][:, self.ts_row])]
                     self.data[file] = self.data[file][np.argsort(self.data[file][:, self.index_row], kind='mergesort')]
 
+
+            #### check if we want to use only part of data:
+            if self.cfg["fraction_of_data"] < 1.:
+                self.data[file] = self.data[file][np.argsort(self.data[file][:, self.ts_row])]
+
+                rows_to_save = int(len(self.data[file]) * self.cfg["fraction_of_data"])
+                time_when_stop = self.data[file][rows_to_save, 0]
+                self.data[file] = self.data[file][self.data[file][:, 0] < time_when_stop]
+                self.data[file] = self.data[file][np.argsort(self.data[file][:, self.index_row], kind='mergesort')]
+
             ### save ped ids
             if cfg["one_ped_one_traj"]:
                 self.unique_ped_ids[file] = np.unique(self.data[file][:, 1])
@@ -120,12 +131,12 @@ class TrajnetLoader:
                 img_format = ".png"
                 if dataset == "SDD":
                     img_format = ".jpg"
-                img = cv2.imread(name[:name.index(".")] + img_format).astype(np.uint8)
+                img = cv2.imread(name[:name.rindex(".")] + img_format).astype(np.uint8)
                 mask = np.ones_like(img)[:, :, 0]
 
                 ## load segmentations
                 if cfg["raster_params"]["use_segm"]:
-                    mask = np.load(name[:name.index(".")] + "_s.npy").astype(np.uint8)
+                    mask = np.load(name[:name.rindex(".")] + "_s.npy").astype(np.uint8)
 
                 # initial resize of image (for speed-up)
                 transf = np.eye(3)
@@ -150,9 +161,9 @@ class TrajnetLoader:
                 transf = transf_border.transformation_matrix @ transf
 
                 ## save to buffer
-                self.loaded_imgs[name[:name.index(".")] + img_format] = img
-                self.img_transf[name[:name.index(".")] + img_format] = transf
-                self.loaded_imgs[name[:name.index(".")] + "_s.npy"] = mask
+                self.loaded_imgs[name[:name.rindex(".")] + img_format] = img
+                self.img_transf[name[:name.rindex(".")] + img_format] = transf
+                self.loaded_imgs[name[:name.rindex(".")] + "_s.npy"] = mask
 
             self.data_len += len(self.data[file])
             self.sub_data_len.append(self.data_len)
@@ -332,14 +343,15 @@ class TrajnetLoader:
         txt_file = self.data_files[dataset_ind]
 
         if self.cfg["raster_params"]["use_segm"]:
-            segm_file = self.path + txt_file[0:txt_file.index(".")] + "_s.npy"
+            segm_file = normpath(self.path +'/'+ txt_file[0:txt_file.index(".")] + "_s.npy")
 
         if "SDD" in txt_file:
             img_type = ".jpg"
         else:
             img_type = ".png"
 
-        img_file = self.path + txt_file[0:txt_file.index(".")] + img_type
+        img_file = normpath(self.path +'/'+ txt_file[0:txt_file.index(".")] + img_type)
+
 #         print(img_file)
 #         print("-----------")
 #         print(self.loaded_imgs.keys())
