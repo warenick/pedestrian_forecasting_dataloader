@@ -14,6 +14,7 @@ from torch.utils.data import DataLoader
 try:
     from config import cfg
     from dataloader import DatasetFromTxt
+    from dataloader import collate_wrapper
 except:
     from pedestrian_forecasting_dataloader.dataloader import DatasetFromTxt
     from pedestrian_forecasting_dataloader.config import cfg
@@ -40,8 +41,8 @@ sdd_files_all = ["SDD/bookstore_0.txt", "SDD/bookstore_1.txt", "SDD/bookstore_2.
 
 
 
-def get_dataloaders(bs=96, num_w=8,
-                    path_="/media/robot/hdd1/hdd_repos/pedestrian_forecasting_dataloader/data/train/",
+def get_dataloaders(bs=10, num_w=0,
+                    path_="data/train/",
                     validate_with="SDD", cfg_=None):
     torch.manual_seed(0)
     print("creating dataloader for validating with ", validate_with)
