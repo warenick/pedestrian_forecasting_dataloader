@@ -75,7 +75,7 @@ class TrajnetLoader:
                     new_name = name[:name.rindex(".")] + ".npy"
                     self.data[file] = np.load(new_name).astype(np.float32)
                 except:
-                    self.data[file] = np.loadtxt(path + "/" + file, delimiter=' ',
+                    self.data[file] = np.loadtxt(normpath(path + "/" + file), delimiter=' ',
                                                  usecols=[0, 1, 2, 3, 4, 5, 6]).astype(np.float32)
                     self.data[file] = self.data[file][self.data[file][:, 6] == 0]
 
@@ -94,9 +94,9 @@ class TrajnetLoader:
             ## IF NOT SDD
 
             if "SDD" not in file:
-                self.data[file] = np.genfromtxt(path + "/" + file, delimiter='').astype(np.float64)
+                self.data[file] = np.genfromtxt(normpath(path + "/" + file), delimiter='').astype(np.float64)
                 self.argsort_inexes[file] = None
-                homography_path = path + "/" + file[:[m.start() for m in re.finditer(r"/", file)][-1]] + "/H.txt"
+                homography_path = normpath(path + "/" + file[:[m.start() for m in re.finditer(r"/", file)][-1]] + "/H.txt")
                 # if "UCY":
                 #     homography_path = path + "/" + file[:file.index("/")] + "/H.txt"
 
