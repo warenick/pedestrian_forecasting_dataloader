@@ -110,7 +110,7 @@ if __name__=="__main__":
 
     cfg["one_ped_one_traj"] = False
     cfg["raster_params"]["draw_hist"] = 1
-    _, val_dataloader = get_dataloaders(bs=10, num_w=0, path_="data/train/", cfg_=cfg)
+    _, val_dataloader = get_dataloaders(bs=4, num_w=0, path_="data/train/", cfg_=cfg)
     pbar = tqdm(val_dataloader)
 
     seed = 6
@@ -118,8 +118,8 @@ if __name__=="__main__":
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
 
-    check_img_noise = True
-    check_poses_noise = True
+    check_img_noise = False
+    check_poses_noise = False
     check_id_nose = True
 
     with torch.no_grad():
@@ -146,12 +146,3 @@ if __name__=="__main__":
                 print((neighb_poses - dn.pose_noise(neighb_poses, neighb_poses_avail)).mean())
             if check_id_nose:
                 self_poses, self_poses_av, neighb_poses, neighb_poses_avail = dn.id_batch_noise(self_poses, self_poses_av, neighb_poses, neighb_poses_avail,num_steps=3)
-                # cutted_poses = torch.cat((self_poses.unsqueeze(1), neighb_poses),dim=1)
-                # cuttet_av = torch.cat((self_poses_av.unsqueeze(1), neighb_poses_avail),dim=1)
-                # print(cutted_poses.mean())
-                # cutted_poses, cuttet_av = dn.id_noise(cutted_poses,cuttet_av)
-                # print(cutted_poses.mean())
-                # self_poses = cutted_poses[:,0]
-                # self_poses_av = cuttet_av[:,0]
-                # neighb_poses = cutted_poses[:,1:]
-                # neighb_poses_avail = cuttet_av[:,1:]
