@@ -46,15 +46,15 @@ class DataNoiser():
             return torch.tensor(imgs)
         return img
 
-    def pose_noise(self, poses, poses_avail=None):
+    def pose_noise(self, poses, poses_avail=None, sigma=1.):
         if poses_avail is None:
-            return poses + torch.randn_like(poses)
+            return poses + torch.randn_like(poses)*sigma
         if poses.dim()==3:
             # return poses + torch.randn_like(poses)*poses_avail[None].permute(1,2,0).expand([-1,-1, poses.shape[-1]])
-            return poses + torch.randn_like(poses)*poses_avail.unsqueeze(-1).expand([-1,-1, poses.shape[-1]])
+            return poses + torch.randn_like(poses)*poses_avail.unsqueeze(-1).expand([-1,-1, poses.shape[-1]])*sigma
         if poses.dim()==4:
             # return poses + torch.randn_like(poses)*poses_avail[None].permute(1,2,3,0).expand([-1,-1,-1, poses.shape[-1]])
-            return poses + torch.randn_like(poses)*poses_avail.unsqueeze(-1).expand([-1,-1,-1, poses.shape[-1]])
+            return poses + torch.randn_like(poses)*poses_avail.unsqueeze(-1).expand([-1,-1,-1, poses.shape[-1]])*sigma
         return poses
 
     def id_noise(self,poses, poses_avail=None, num_steps=1):
