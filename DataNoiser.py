@@ -17,32 +17,60 @@ class DataNoiser():
         self.seed = seed
         # self.generator = torch.Generator()
         
-    def batch_img_noise(self, batch, mode=None):
+
+    # mean : float, optional
+    #     Mean of random distribution. Used in 'gaussian' and 'speckle'.
+    #     Default : 0.
+    # var : float, optional
+    #     Variance of random distribution. Used in 'gaussian' and 'speckle'.
+    #     Note: variance = (standard deviation) ** 2. Default : 0.01
+    # local_vars : ndarray, optional
+    #     Array of positive floats, same shape as `image`, defining the local
+    #     variance at every image point. Used in 'localvar'.
+    # amount : float, optional
+    #     Proportion of image pixels to replace with noise on range [0, 1].
+    #     Used in 'salt', 'pepper', and 'salt & pepper'. Default : 0.05
+    # "gaussian" "localvar" "poisson" "salt" "pepper" "s&p" "speckle"
+    def __add_img_noise__(self, data, mode, seed, mean, var, amount, device, dtype, to_tensor = True):
+        if 'gaussian' in mode or 'speckle' in mode:
+            if to_tensor:
+                return torch.tensor(random_noise(data.cpu(), mode=mode, clip = True, seed=seed, mean=mean, var=var),device=device,dtype=dtype)
+            return random_noise(data.cpu(), mode=mode, clip = True, seed=seed, mean=mean, var=var)
+        if 'salt' in mode or 'pepper' in mode or 's&p' in mode or 'speckle' in mode:
+            if to_tensor:
+                return torch.tensor(random_noise(data.cpu(), mode=mode, clip = True, seed=seed, amount=amount),device=device,dtype=dtype)
+            return random_noise(data.cpu(), mode=mode, clip = True, seed=seed, amount=amount)
+        return torch.tensor(random_noise(data.cpu(), mode=mode, clip = True, seed=seed),device=device,dtype=dtype)
+
+    def batch_img_noise(self, batch, mode=None, mean = 0, var = 0.01, amount = 0.05):
         if mode is None:
             return batch
         if batch.dim()==3:
             batch = batch.permute(1,2,0)
-            batch = torch.tensor(random_noise(batch, mode=mode, clip = True, seed=self.seed))
+            batch = self.__add_img_noise__(batch, mode, self.seed, mean, var, amount, batch.device,batch.dtype)# torch.tensor(random_noise(batch.cpu(), mode=mode, clip = True, seed=self.seed, mean=mean, var=var, amount=amount),device=batch.device,dtype=batch.dtype)
             return batch.permute(2,0,1)
         if batch.dim()==4:
             imgs = []
             batch = batch.permute(0,2,3,1)
             for i in batch:
-                imgs.append(random_noise(i, mode=mode, clip = True, seed=self.seed))
-            batch = torch.tensor(imgs).permute(0,3,1,2)
+                # imgs.append(random_noise(i.cpu(), mode=mode, clip = True, seed=self.seed, mean=mean, var=var, amount=amount))
+                imgs.append(self.__add_img_noise__(i, mode, self.seed, mean, var, amount, batch.device,batch.dtype, to_tensor= False))
+            batch = torch.tensor(imgs,device=batch.device,dtype=batch.dtype).permute(0,3,1,2)
             return batch
         return batch
 
 
-    def img_noise(self, img, mode=None):
+    def img_noise(self, img, mode=None, mean = 0, var = 0.01, amount = 0.05):
         if mode is None:
             return img
         if img.dim()==3:
-            return torch.tensor(random_noise(img, mode=mode, clip = True, seed=self.seed))
+            return self.__add_img_noise__(img, mode, self.seed, mean, var, amount, img.device,img.dtype)
+            # return torch.tensor(random_noise(img, mode=mode, clip = True, seed=self.seed, mean=mean, var=var, amount=amount))
         if img.dim()==4:
             imgs = []
             for i in img:
-                imgs.append(random_noise(i, mode=mode, clip = True, seed=self.seed))
+                imgs.append(self.__add_img_noise__(i, mode, self.seed, mean, var, amount, img.device,img.dtype))
+                # imgs.append(random_noise(i, mode=mode, clip = True, seed=self.seed, mean=mean, var=var, amount=amount))
             return torch.tensor(imgs)
         return img
 
