@@ -615,6 +615,7 @@ def vis_image_Aleksander(image, distr, raster_from_agent, tgt = None,  index = 0
     dist_image = vis_pdf2(image, distr, raster_from_agent, index=index)
     cmap = plt.get_cmap('jet')
     dist_image = cmap(0.8*dist_image.detach().numpy())
+    dist_image[:, :, 2][dist_image[:, :, 2] == 0.5] *= 0
     img_arr = torch.clamp(0.7*image/255 + 0.3 * dist_image[:, :, :3], max=1)
     # img_arr = heatmap2d_withiImg(dist_image, image)
     return img_arr[:, :, :3]
